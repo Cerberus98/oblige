@@ -14,15 +14,18 @@ from utils import translate_netmask
 from utils import to_mac_range
 from utils import make_offset_lengths
 from utils import mysqlize
+from utils import get_config
 
 class Oblige(object):
     def __init__(self):
+        config = get_config()
+        self.dbpw = config.get('oblige', 'dbpw')
         self.start_time = time.time()
         self.debug = False
                 
         conn = MySQLdb.connect(host = "localhost",
                                user = "root",
-                               passwd = "password",
+                               passwd = self.dbpw,
                                db = "melange")
         cursor = conn.cursor()
         if self.debug:
@@ -251,7 +254,7 @@ class Oblige(object):
         
         quark_conn = MySQLdb.connect(host = "localhost",
                                      user = "root",
-                                     passwd = "password")
+                                     passwd = self.dbpw)
         print("Initializing quark cursor")
         quark_cursor = quark_conn.cursor()
         print("Dropping quark")
@@ -923,7 +926,7 @@ class Oblige(object):
     def inserts(self):
         conn = MySQLdb.connect(host = "localhost",
                            user = "root",
-                           passwd = "Br_-00jWp2McAf--@",
+                           passwd = self.dbpw,
                            db = "quark")
         conn.autocommit(True)
         cursor = conn.cursor()

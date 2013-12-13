@@ -1,5 +1,17 @@
 import netaddr
 import datetime # need the type
+import ConfigParser as cfgp
+import os
+
+def get_config():
+    possible_configs = [os.path.expanduser('~/.oblige_config'),
+                        '.oblige_config']
+    config = cfgp.RawConfigParser()
+    config.read(possible_configs)
+    if len(config.sections()) < 1:
+        return None
+    return config
+
 
 def mysqlize(some_object):
     members = [attr for attr in dir(some_object)
