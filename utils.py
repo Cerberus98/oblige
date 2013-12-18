@@ -2,6 +2,7 @@ import netaddr
 import datetime # need the type
 import ConfigParser as cfgp
 import os
+import math
 
 def get_config():
     possible_configs = [os.path.expanduser('~/.oblige_config'),
@@ -54,9 +55,10 @@ def translate_netmask(netmask, destination):
     try:
         a = netaddr.IPAddress(netmask)
         return str(netaddr.IPNetwork("{0}/{1}".format(destination, 32 - int(math.log(2 ** 32 - a.value, 2)))))  # noqa
-    except Exception:
+    except Exception as e:
         print("Could not generate cidr, netmask {0} destination {1}".
                 format(netmask, destination))
+        print e
 
 def to_mac_range(val):
     cidr_parts = val.split("/")
