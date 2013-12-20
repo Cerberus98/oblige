@@ -261,7 +261,7 @@ class Oblige(object):
         print("Using quark")
         quark_cursor.execute("use quark")
         print("Creating quark schema")
-        quark_schema = open("__schema__.sql").read()
+        quark_schema = open("__schema_2__.sql").read()
         quark_cursor.execute(quark_schema)
         quark_cursor.close()
         quark_conn.close()
@@ -432,7 +432,7 @@ class Oblige(object):
         print("Migrating interfaces...")
         m = 0
         n = 0
-        the_service_network = netaddr.IPNetwork('10.0.0.0/8')
+        cell_regex = re.compile("\w{3}-\w{1}\d{4}")
         for interface_id, interface in self.interfaces.iteritems():
             if interface_id not in self.interface_network:
                 # print("No network for {}".format(interface_id))
@@ -440,13 +440,16 @@ class Oblige(object):
                 continue
             m += 1
             network_id = self.interface_network[interface_id]
-            ips = self.interface_ip[interface_id]
-            for ip in ips:
-                if netaddr.IPAddress(ip.address) in the_service_network:
-                    print("{} in servicenet".format(ip.address))
-
-                #else:
-                #    print("{} not in servicenet".format(ip.address))
+            the_block = self.quark_networks[network_id]
+            bridge_name = None
+            if cell_regex.match(the_block.tenant_id):
+                # this is a rackspace interface
+                if the_block.name == "public":
+                    bridge_name = "publicnet"
+                elif the_block.name == "private":
+                    bridge_name = "servicenet"
+                else:
+                    raise Exception("NOOOooooo!")
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
@@ -460,7 +463,7 @@ class Oblige(object):
                     backend_key=port_id,
                     network_id=network_id,
                     mac_address=interface.mac_address,
-                    bridge=None, # TODO needed for ['publicnet','servicenet'] and depend on env
+                    bridge=bridge_name, # ['publicnet','servicenet'] depends on env
                     device_owner=None)  # Prolly OKay (Comrade Dovvy)
             lswitch_id = str(uuid4())
             q_nvp_switch = quark.QuarkNvpDriverLswitch(
