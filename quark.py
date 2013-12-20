@@ -65,13 +65,15 @@ class QuarkTag(object):
         self.tag = tag
 
 class QuarkNetwork(object):
-    def __init__(self, id, tenant_id, created_at, name, max_allocation):
+    def __init__(self, id, tenant_id, created_at, name, max_allocation,
+            network_plugin):
         self.id = id
         self.tenant_id = tenant_id
         self.created_at = created_at
         self.name = name
         self.max_allocation = max_allocation  # TODO: not in ERD
-        
+        self.network_plugin = network_plugin
+
 class QuarkTagAssociation(object):
     def __init__(self, id, created_at, discriminator):
         self.id = id
@@ -99,11 +101,13 @@ class QuarkSubnet(object):
         self.segment_id = tenant_id
 
 class QuarkDnsNameserver(object):
-    def __init__(self, ip, subnet_id, created_at, tenant_id):
+    def __init__(self, id, ip, subnet_id, created_at, tenant_id):
+        self.id = id
         self.ip = ip
         self.subnet_id = subnet_id
         self.created_at = created_at  # TODO: Not in ERD
         self.tenant_id = tenant_id  # TODO: Not in ERD
+        self.tag_association_uuid = None
 
 class QuarkNvpDriverLswitch(object):
     def __init__(self, id, nvp_id, network_id, display_name, port_count,
@@ -119,9 +123,10 @@ class QuarkNvpDriverLswitch(object):
         self.segment_connector = segment_connector
 
 class QuarkNvpDriverLswitchPort(object):
-    def __init__(self, port_id, switch_id):
+    def __init__(self, port_id, switch_id, created_at):
         self.port_id = port_id
         self.switch_id = switch_id
+        self.created_at = created_at
 
 class QuarkRoute(object):
     def __init__(self, id, tenant_id, created_at, cidr, gateway, subnet_id,

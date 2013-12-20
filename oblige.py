@@ -83,7 +83,8 @@ class Oblige(object):
                 address = mac[1],
                 mac_address_range_id = mac[2],
                 interface_id = mac[3],
-                created_at = mac[4])})
+                created_at = mac[4],
+                updated_at = mac[5])})
             self.interfaces[mac[3]].mac_address = mac[1]
         print("Got {} mac_addresses...".format(len(self.mac_addresses)))
 
@@ -238,11 +239,7 @@ class Oblige(object):
         self.quark_routes = {}
         self.quark_ip_policies = {}
         self.quark_ip_policy_rules = {}
-        self.quark_nvp_stuff = {}  # lswitch: port
-        
-        # self.quark_nvp_driver_lswitches = {}
-        # self.quark_nvp_driver_lswitchports = {}
-
+        self.quark_nvp_stuff = {}
         self.policy_ids = {}
         self.interface_network = {}
         self.interface_ip = {}
@@ -264,7 +261,7 @@ class Oblige(object):
         print("Using quark")
         quark_cursor.execute("use quark")
         print("Creating quark schema")
-        quark_schema = open("__schema__.sql").read()
+        quark_schema = open("__schema_2__.sql").read()
         quark_cursor.execute(quark_schema)
         quark_cursor.close()
         quark_conn.close()
@@ -273,14 +270,20 @@ class Oblige(object):
     def migrate_networks(self):
         print("Migrating networks...")
         networks = {}
+        cell_regex = re.compile("\w{3}-\w{1}\d{4}")
         m = 0
         for block_id, block in self.ip_blocks.iteritems():
+            netplugin = 'NVP'
+            if cell_regex.match(block.tenant_id):
+                print("\tRackspace tenant: {}".format(block.tenant_id))
+                netplugin = 'UNMANAGED'
             if _br(block.network_id) not in networks:
                 networks[_br(block.network_id)] = {
                         "tenant_id": block.tenant_id,
                         "name": block.network_name,
                         "max_allocation": block.max_allocation,
-                        "created_at": block.created_at}
+                        "created_at": block.created_at,
+                        "network_plugin": netplugin}
             elif _br(block.network_id) in networks:
                 if networks[_br(block.network_id)]["created_at"] > block.created_at:
                     networks[_br(block.network_id)]["created_at"] = block.created_at
@@ -293,10 +296,13 @@ class Oblige(object):
                     tenant_id=cache_net["tenant_id"],
                     name=cache_net["name"],
                     max_allocation=cache_net["max_allocation"],
-                    created_at=networks[_br(net_id)]["created_at"])
+                    created_at=networks[_br(net_id)]["created_at"],
+                    network_plugin=cache_net["network_plugin"])
             self.quark_networks[q_network.id] = q_network
             m += 1
         for block_id, block in self.ip_blocks.iteritems():
+            if not block.allocatable_ip_counter:
+                block.allocatable_ip_counter = netaddr.IPNetwork(block.cidr).first
             self.quark_subnets.update({block.id: quark.QuarkSubnet(
                     id=block.id,
                     name=block.network_name,
@@ -304,34 +310,35 @@ class Oblige(object):
                     created_at=block.created_at,
                     network_id=_br(block.network_id),
                     _cidr=block.cidr,
-                    first_ip=None,  # get with netaddr (bigint) TODO
-                    last_ip=None,
-                    ip_version=None,  # netaddr int TODO
+                    first_ip=netaddr.IPNetwork(block.cidr).first,
+                    last_ip=netaddr.IPNetwork(block.cidr).last,
+                    ip_version=netaddr.IPNetwork(block.cidr).version,
                     ip_policy_id=block.policy_id,
-                    next_auto_assign_ip=None,  # TODO need to get this
-                    tag_association_uuid=None,  # These aren't used
+                    next_auto_assign_ip=block.allocatable_ip_counter,
+                    tag_association_uuid=None,
                     do_not_use=block.omg_do_not_use)})
             if block.dns1: 
                 self.quark_dns_nameservers.update({block.id: quark.QuarkDnsNameserver(
+                    id=str(uuid4()),
                     ip=int(netaddr.IPAddress(block.dns1)),
                     created_at=block.created_at,
                     tenant_id=block.tenant_id,
                     subnet_id=block.id)})
             if block.dns2:
                 self.quark_dns_nameservers.update({block.id: quark.QuarkDnsNameserver(
+                    id=str(uuid4()),
                     ip=int(netaddr.IPAddress(block.dns2)),
                     created_at=block.created_at,
                     tenant_id=block.tenant_id,
                     subnet_id=block.id)})
-            # self.migrate_ips(block)
             self.migrate_routes(block)
             if block.policy_id:
                 if block.policy_id not in self.policy_ids.keys():
                     self.policy_ids[block.policy_id] = {}
                 self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
             else:
-                # print("Block lacks policy: {}".format(block.id))
-                pass
+                print("Block lacks policy: {}".format(block.id))
+                #pass
         # add routes:
         for block in self.ip_blocks.values():
             if block.gateway:
@@ -341,14 +348,15 @@ class Oblige(object):
 
     def migrate_routes(self, block):
         for route_id, route in self.ip_routes.iteritems():
-            if route_id == block.id:
+            if route.source_block_id == block.id:
                 self.quark_routes.update({route_id: quark.QuarkRoute(
-                    id = route_id,
+                    id=route_id,
                     cidr=translate_netmask(route.netmask, route.destination),
                     tenant_id=block.tenant_id,
                     gateway=route.gateway,
                     created_at=block.created_at,
-                    subnet_id=block_id)})
+                    subnet_id=block.id,
+                    tag_association_uuid=None)})
     
 
     def migrate_new_routes(self, block):
@@ -359,8 +367,8 @@ class Oblige(object):
         else:  # TODO not all of these will look like this RE: dobby
             destination = '0:0:0:0:0:0:0:0/0'
         self.quark_routes.update({block.id: quark.QuarkRoute(
-            id=None,  # TODO: how do we insert this without stepping on others?
-            tag_association_uuid=None,  # TODO: check this
+            id=str(uuid4()),
+            tag_association_uuid=None,
             cidr=destination,
             tenant_id=block.tenant_id,
             gateway=block.gateway,
@@ -368,7 +376,7 @@ class Oblige(object):
             created_at=datetime.utcnow())})
 
 
-    def migrate_ips(self):  # , block):
+    def migrate_ips(self):
         print("Migrating ips...")
         m = 0
         ip_addr_cache = {}
@@ -380,21 +388,18 @@ class Oblige(object):
         for block_id, addresses in ip_addr_cache.iteritems():
             block = self.ip_blocks[block_id]
             for address in addresses:
-        #for block_id, block in self.ip_blocks.iteritems():
-            #for address in [x for x in self.ip_addresses.values()
-                    #if x.ip_block_id == block_id]:
                 m += 1
                 """Populate interface_network cache"""
-                interface = address.interface_id
-                if interface is not None and\
-                        interface not in self.interface_network:
-                    self.interface_network[interface] = _br(block.network_id)
-                if interface in self.interface_network and\
-                        self.interface_network[interface] != _br(block.network_id):
+                interface_id = address.interface_id
+                if interface_id is not None and\
+                        interface_id not in self.interface_network:
+                    self.interface_network[interface_id] = _br(block.network_id)
+                if interface_id in self.interface_network and\
+                        self.interface_network[interface_id] != _br(block.network_id):
                     pass  # TODO this?
                     #print("Found interface with different "
                     #               "network id: {0} != {1}"
-                    #               .format(self.interface_network[interface],
+                    #               .format(self.interface_network[interface_id],
                     #                       _br(block.network_id)))
                 deallocated = False
                 deallocated_at = None
@@ -417,10 +422,9 @@ class Oblige(object):
                         address=int(ip_address.ipv6()),
                         allocated_at=block.updated_at)
                 self.quark_ip_addresses.update({address.id: q_ip})
-                # Populate interface_ip cache
-                if interface not in self.interface_ip:
-                    self.interface_ip[interface] = set()
-                self.interface_ip[interface].add(q_ip)
+                if interface_id not in self.interface_ip:
+                    self.interface_ip[interface_id] = set()
+                self.interface_ip[interface_id].add(q_ip)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -428,6 +432,7 @@ class Oblige(object):
         print("Migrating interfaces...")
         m = 0
         n = 0
+        cell_regex = re.compile("\w{3}-\w{1}\d{4}")
         for interface_id, interface in self.interfaces.iteritems():
             if interface_id not in self.interface_network:
                 # print("No network for {}".format(interface_id))
@@ -435,26 +440,36 @@ class Oblige(object):
                 continue
             m += 1
             network_id = self.interface_network[interface_id]
+            the_block = self.quark_networks[network_id]
+            bridge_name = None
+            if cell_regex.match(the_block.tenant_id):
+                # this is a rackspace interface
+                if the_block.name == "public":
+                    bridge_name = "publicnet"
+                elif the_block.name == "private":
+                    bridge_name = "servicenet"
+                else:
+                    raise Exception("NOOOooooo!")
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
                 port_id = "TODO"  # TODO don't know how to get on my level son
             q_port = quark.QuarkPort(
                     id=interface_id,
-                    name=None,
+                    name=None, # shouldn't matter (Dobby)
                     device_id=interface.device_id,
                     tenant_id=interface.tenant_id,
                     created_at=interface.created_at,
                     backend_key=port_id,
                     network_id=network_id,
                     mac_address=interface.mac_address,
-                    bridge=None, # TODO needed for pub/snet and depend on env
-                    device_owner=None)  # TODO
+                    bridge=bridge_name, # ['publicnet','servicenet'] depends on env
+                    device_owner=None)  # Prolly OKay (Comrade Dovvy)
             lswitch_id = str(uuid4())
             q_nvp_switch = quark.QuarkNvpDriverLswitch(
                     id=lswitch_id,
                     nvp_id=network_id,
-                    network_id=network_id, # TODO: axe justin probby okay
+                    network_id=network_id,
                     display_name=network_id,
                     port_count=None,
                     transport_zone=None,
@@ -463,14 +478,13 @@ class Oblige(object):
                     segment_connector=None)
             q_nvp_port = quark.QuarkNvpDriverLswitchPort(
                     port_id=port_id,
-                    switch_id=lswitch_id)
+                    switch_id=lswitch_id,
+                    created_at=interface.created_at)
             if q_nvp_switch in self.quark_nvp_stuff:
                 self.quark_nvp_stuff[q_nvp_switch].append(q_nvp_port)
             else:
                 self.quark_nvp_stuff.update({q_nvp_switch: [q_nvp_port]})
-
             self.port_cache[interface_id] = q_port
-
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
         print("\t\t{} not migrated (no network).".format(n))
 
@@ -508,13 +522,13 @@ class Oblige(object):
                 m += 1
                 tenant_id = self.interface_tenant[mac.interface_id]
                 q_mac = quark.QuarkMacAddress(
-                        id=None,
+                        id=str(uuid4()),
                         tenant_id=tenant_id,
                         created_at=mac.created_at,
                         mac_address_range_id=mac_range.id,
                         address=mac.address,
                         deallocated=dealloc,  # TODO
-                        deallocated_at=None)  # TODO
+                        deallocated_at=mac.updated_at)  # TODO
                 if mac_range_id not in self.quark_mac_addresses:
                     self.quark_mac_addresses.update({mac_range_id: [q_mac]})
                 else:
@@ -553,12 +567,15 @@ class Oblige(object):
             for block_id in policy_block_ids.keys():
                 policy_uuid = policy
                 q_network = self.quark_networks[policy_block_ids[block_id]]
+                the_name = self.policies[policy].name
+                if not policy_description:
+                    the_desc = the_name
                 q_ip_policy = quark.QuarkIpPolicy(
                         id=policy_uuid,
                         tenant_id=q_network.tenant_id,
-                        description=policy_description,
+                        description=policy_description or the_desc,
                         created_at=min_created_at,
-                        name=self.policies[policy].name)  # TODO
+                        name=the_name)  # TODO
                 self.quark_ip_policies.update({policy_uuid: q_ip_policy})
                 # q_ip_policy.subnets.append(self.quark_subnets[block_id])
                 for rule in policy_rules:
@@ -574,6 +591,7 @@ class Oblige(object):
 
     def insert_networks(self, cursor):
         print("Inserting networks...")
+        m = 0
         query = """
         INSERT 
         INTO quark_networks (
@@ -582,30 +600,33 @@ class Oblige(object):
             `created_at`, 
             `name`,
             `ipam_strategy`,
-            `max_allocation`) 
+            `max_allocation`,
+            `network_plugin`) 
         VALUES """
         #  TODO TODO
         # if network is public or snet -> network_plugin == UNMANAGED
         # else network_plugin == NVP
         for record in self.quark_networks.values():
+            m += 1
             record = mysqlize(record)
-            query += "({0},{1},{2},{3},'{4}',{5}),\n".format(record.id,
+            query += "({0},{1},{2},{3},'{4}',{5},{6}),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
-                                                   'ANY',
-                                                   record.max_allocation)
+                                                   'ANY',  # default ANY strategy
+                                                   record.max_allocation,
+                                                   record.network_plugin)
         query = query.rstrip(',\n')
         with open('quark_networks.sql', 'w') as f:
             f.write(query)
-        
         cursor.execute(query)
-        print("\tDone, {:.2f} sec, sizeof {}, len {}".format(
-            time.time() - self.start_time, sys.getsizeof(query), len(query)))
+        print("\tDone, {:.2f} sec, {} migrated.".format(
+            time.time() - self.start_time, m))
 
 
     def insert_ports(self, cursor):
         print("Inserting ports...")
+        m = 0
         query = """
         INSERT 
         INTO quark_ports (
@@ -623,6 +644,7 @@ class Oblige(object):
         VALUES """
         for record in self.port_cache.values():
             record = mysqlize(record)
+            m += 1
             query += "({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}),\n".format(
                     record.id,
                     record.tenant_id,
@@ -639,12 +661,13 @@ class Oblige(object):
         with open('quark_ports.sql', 'w') as f:
             f.write(query)
         cursor.execute(query)
-        print("\tDone, {:.2f} sec, sizeof {}, len {}".format(
-            time.time() - self.start_time, sys.getsizeof(query), len(query))) 
+        print("\tDone, {:.2f} sec, {} migrated.".format(
+            time.time() - self.start_time, m)) 
    
 
     def insert_subnets(self, cursor):
         print("Inserting subnets...")
+        m = 0
         query = """
         INSERT
         INTO quark_subnets (
@@ -665,6 +688,7 @@ class Oblige(object):
             `segment_id`)
         VALUES """
         for record in self.quark_subnets.values():
+            m += 1
             record = mysqlize(record)
             query += "({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14}),\n".format(
                     record.id,
@@ -685,16 +709,15 @@ class Oblige(object):
         with open("quark_subnets.sql", 'w') as f:
             f.write(query)
         cursor.execute(query.rstrip(',\n'))
-        print("\tDone, {:.2f} sec".format(
-            time.time() - self.start_time))
+        print("\tDone, {:.2f} sec, {} migrated.".format(
+            time.time() - self.start_time, m))
 
 
     def insert_ip_addresses(self, cursor):
         print("Inserting ip addresses...")
+        m = 0
         # this giant query needs to be broken down into bite-sized chunks
         # make a list of the strings for insertion then send them off
-
-        #cursor.execute("SET foreign_key_checks = 0")
         query_head = """
         INSERT
         INTO quark_ip_addresses (
@@ -714,6 +737,7 @@ class Oblige(object):
         all_records = []
         for record in self.quark_ip_addresses.values():
             record = mysqlize(record)
+            m += 1
             all_records.append("({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}),\n".format(
                     record.id,
                     record.address_readable,
@@ -739,12 +763,12 @@ class Oblige(object):
                 f.write(query_head + current_block.rstrip(',\n'))
             cursor.execute(query_head + current_block.rstrip(',\n'))
             records_handled += query_size
-        #cursor.execute("SET foreign_key_checks = 1")
-        print("\tDone, {:.2f} sec".format(time.time() - self.start_time))
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
     def insert_port_ip_assn(self, cursor):
         print("Inserting port_ip_address_associations...")
+        m = 0
         query_head = """
         INSERT
         INTO quark_port_ip_address_associations (
@@ -752,13 +776,9 @@ class Oblige(object):
             `ip_address_id`)
         VALUES """
         all_records = []
-        # for port_id in self.port_cache:
-        #    self.port_cache[port_id].ip_addresses = self.interface_ip[port_id]
-        
         for port_id, port in self.port_cache.iteritems():
-            #if type(port.ip_addresses) is not list:
-                # print port.ip_addresses
             for ip in list(port.ip_addresses):
+                m += 1
                 all_records.append("('{0}',{1}),\n".format(port_id, ip.id))
         query_size = current_stop = 200000
         records_handled = 0
@@ -766,18 +786,17 @@ class Oblige(object):
             if len(all_records) < current_stop:
                 current_stop = len(all_records)
             current_block = "".join(all_records[records_handled:current_stop])
-            # print records_handled
             with open('quark_port_ip_assn.sql', 'w') as f:
                 f.write(query_head + current_block.rstrip(',\n'))
             current_stop += query_size
             cursor.execute(query_head + current_block.rstrip(',\n'))
             records_handled += query_size
-        print("\tDone, {:.2f} sec, {} records".format(time.time() - self.start_time,
-            records_handled))
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
     
 
     def insert_policies(self, cursor):
         print("Inserting policies...")
+        m = 0
         query = """
         INSERT
         INTO quark_ip_policy (
@@ -788,6 +807,7 @@ class Oblige(object):
             `created_at`)
         VALUES """
         for record in self.quark_ip_policies.values():
+            m += 1
             record = mysqlize(record)
             query += "({0},{1},{2},{3},{4}),\n".format(
                     record.id,
@@ -798,11 +818,12 @@ class Oblige(object):
         with open('quark_ip_policies.sql', 'w') as f:
             f.write(query.rstrip(',\n'))
         cursor.execute(query.rstrip(',\n'))
-        print("\tDone, {:.2f} sec".format(time.time() - self.start_time))
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
    
 
     def insert_lswitches(self, cursor):
         print("Inserting nvp driver lswitches...")
+        m = 0
         query = """
         INSERT 
         INTO quark_nvp_driver_lswitch (
@@ -818,14 +839,16 @@ class Oblige(object):
         port_query = """
         INSERT
         INTO quark_nvp_driver_lswitchport (
+            `id`,
             `port_id`,
-            `switch_id`)
+            `switch_id`,
+            `created_at`)
         VALUES """
-
+        switchids = []
         for switch, ports in self.quark_nvp_stuff.iteritems():
             switch = mysqlize(switch)
             query += "({0},{1},{2},{3},{4},{5},{6},{7}),\n".format(
-                    switch.id,  # duplicate key error
+                    switch.id,
                     switch.nvp_id,
                     switch.network_id,
                     switch.display_name,
@@ -835,24 +858,28 @@ class Oblige(object):
                     switch.segment_connector,
                     switch.segment_id) # TODO: created_at add
             for port in ports:
-                port = mysqlize(port)
-                port_query += "({0},{1}),\n".format(port.port_id, switch.id)
+                if port.port_id != 'TODO':
+                    m += 1
+                    port = mysqlize(port)
+                    port_query += "('{0}',{1},{2},{3}),\n".format(str(uuid4()),
+                            port.port_id, switch.id, port.created_at)
         query = query.rstrip(',\n')
         port_query = port_query.rstrip(',\n')
         with open("quark_nvp_lswitch.sql", "w") as f:
             f.write(query)
         with open("quark_nvp_ports.sql", "w") as f:
             f.write(port_query)
-        cursor.execute(query)
         try:
+            cursor.execute(query)
             cursor.execute(port_query)
         except Exception as e:
             print("\tError inserting nvp ports: {}".format(e))
-        print("\tDone, {:.2f} sec".format(time.time() - self.start_time))
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
    
 
     def insert_mac_addresses(self, cursor):
         print("Inserting mac addressess...")
+        m = 0
         query = """
         INSERT
         INTO quark_mac_addresses (
@@ -862,30 +889,30 @@ class Oblige(object):
             `mac_address_range_id`,
             `deallocated`,
             `deallocated_at`)
-        VALUES """  # TODO: make sure that NULL is okay for deallocated
-        # self.quark_macs.update({mac_range_id: [q_mac]})
+        VALUES """
         for mac_range_id, macs in self.quark_mac_addresses.iteritems():
-            # insert the mac_address_range TODO
+            mac_range = mysqlize(self.mac_address_ranges[mac_range_id])
+            # There is only one mac range so this is fine:
             cursor.execute("""
             INSERT
-            INTO
-            quark_mac_address_ranges (
+            INTO quark_mac_address_ranges (
                 `id`,
                 `created_at`,
                 `cidr`,
                 `first_address`,
                 `last_address`,
                 `next_auto_assign_mac`)
-            VALUES ('{0}',{1},'{2}','{3}','{4}','{5}')""".format(
-                mac_range_id,
-                'NULL',
-                1,
-                1,  # TODO: fill these in
-                1,
-                1))
+            VALUES ({0},{1},{2},{3},{4},{5})""".format(
+                mac_range.id,
+                mac_range.created_at,
+                mac_range.cidr,
+                mac_range.first_address,
+                mac_range.last_address,
+                mac_range.next_auto_assign_mac))
             for mac in macs:
+                m += 1
                 mac = mysqlize(mac)
-                query += "({0},{1},{2},{3},{4},{5}),\n".format(
+                query += "({0},{1},{2},{3},'0',{5}),\n".format(
                         mac.tenant_id,
                         mac.created_at,
                         mac.address,
@@ -894,25 +921,89 @@ class Oblige(object):
                         mac.deallocated_at)
         query = query.rstrip(',\n')
         cursor.execute(query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
-        print("\tDone, {:.2f} sec".format(time.time() - self.start_time))
 
-
-    def insert_mac_address_ranges(self, cursor):
-        print("Inserting mac address ranges... \tTODO")
+    def insert_routes(self, cursor):
+        print("Inserting routes...")
         query = """
         INSERT
-        INTO quark_mac_addresses_ranges (
+        INTO quark_routes (
             `id`,
+            `tenant_id`,
             `created_at`,
             `cidr`,
-            `first_address`,
-            `last_address`,
-            `next_auto_assign_max`)
+            `gateway`,
+            `subnet_id`,
+            `tag_association_uuid`)
         VALUES """
-        # for record in ... TODO
-        #
-        print("\tDone, {:.2f} sec".format(time.time() - self.start_time))
+        for route_id, route in self.quark_routes.iteritems():
+            record = mysqlize(route)
+            query += "({0},{1},{2},{3},{4},{5},{6}),\n".format(
+                    record.id,
+                    record.tenant_id,
+                    record.created_at,
+                    record.cidr,
+                    record.gateway,
+                    record.subnet_id,
+                    record.tag_association_uuid)
+        query = query.rstrip(',\n')
+        cursor.execute(query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
+            len(self.quark_routes)))
+
+
+    def insert_quark_dns_nameservers(self, cursor):
+        print("Inserting dns nameservers...")
+        query = """
+        INSERT
+        INTO quark_dns_nameservers (
+            `id`,
+            `tenant_id`,
+            `created_at`,
+            `ip`,
+            `subnet_id`,
+            `tag_association_uuid`)
+        VALUES """
+        for ns_id, ns in self.quark_dns_nameservers.iteritems():
+            record = mysqlize(ns)
+            query += "({0},{1},{2},{3},{4},{5}),\n".format(
+                    record.id,
+                    record.tenant_id,
+                    record.created_at,
+                    record.ip,
+                    record.subnet_id,
+                    record.tag_association_uuid)
+        query = query.rstrip(',\n')
+        cursor.execute(query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
+            len(self.quark_dns_nameservers)))
+
+
+    def insert_ip_policy_rules(self, cursor):
+        print("Inserting ip policy rules...")
+        query = """
+        INSERT
+        INTO quark_ip_policy_rules (
+            `id`,
+            `ip_policy_id`,
+            `created_at`,
+            `offset`,
+            `length`)
+        VALUES """
+        for rule_id, rule in self.quark_ip_policy_rules.iteritems():
+            record = mysqlize(rule)
+            query += "({0},{1},{2},{3},{4}),\n".format(
+                    record.id,
+                    record.ip_policy_id,
+                    record.created_at,
+                    record.offset,
+                    record.length)
+        query = query.rstrip(',\n')
+        cursor.execute(query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
+            len(self.quark_ip_policy_rules)))
+
 
     def migrates(self):
         self.migrate_networks()
@@ -938,16 +1029,19 @@ class Oblige(object):
         self.insert_ip_addresses(cursor)
         self.insert_port_ip_assn(cursor)
         self.insert_lswitches(cursor)
-        # self.insert_lswitch_ports(cursor)
         self.insert_mac_addresses(cursor)
-        # self.insert_mac_address_ranges(cursor)
+        self.insert_routes(cursor)
+        self.insert_quark_dns_nameservers(cursor)
+        self.insert_ip_policy_rules(cursor)
         cursor.close()
         conn.close()
 
-# TODO: null data validator
 
 if __name__ == "__main__":
     o = Oblige()
+    print("-" * 40)
     o.migrates()
+    print("-" * 40)
     o.inserts()
+    print("-" * 40)
     print("TOTAL TIME: {}".format(timedelta(seconds=time.time()-o.start_time)))

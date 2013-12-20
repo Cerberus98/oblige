@@ -77,12 +77,13 @@ class MacAddressRange(object):
 
 class MacAddress(object):
     def __init__(self, id, address, mac_address_range_id, interface_id,
-            created_at):
+            created_at, updated_at):
         self.id = id
         self.address = address
         self.mac_address_range_id = mac_address_range_id
         self.interface_id = interface_id
         self.created_at = created_at
+        self.updated_at = updated_at
 
 class IpAddress(object):
     def __init__(self, id, address, interface_id, ip_block_id,
