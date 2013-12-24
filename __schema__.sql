@@ -429,6 +429,20 @@ CREATE TABLE `quark_tags` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
+
+DROP TABLE IF EXISTS `quark_quotas`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE  TABLE IF NOT EXISTS `quark_quotas` (
+  `id` VARCHAR(36) NOT NULL ,
+  `tenant_id` VARCHAR(255) NULL ,
+  `resource` VARCHAR(255) NULL ,
+  `limit` INT(11) NULL ,
+  PRIMARY KEY (`id`) 
+) ENGINE = InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
