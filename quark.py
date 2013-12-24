@@ -66,13 +66,14 @@ class QuarkTag(object):
 
 class QuarkNetwork(object):
     def __init__(self, id, tenant_id, created_at, name, max_allocation,
-            network_plugin):
+            network_plugin, ipam_strategy):
         self.id = id
         self.tenant_id = tenant_id
         self.created_at = created_at
         self.name = name
         self.max_allocation = max_allocation  # TODO: not in ERD
         self.network_plugin = network_plugin
+        self.ipam_strategy = ipam_strategy
 
 class QuarkTagAssociation(object):
     def __init__(self, id, created_at, discriminator):
@@ -99,6 +100,25 @@ class QuarkSubnet(object):
         self.do_not_use = do_not_use
         self.enable_dhcp = False  # TODO
         self.segment_id = tenant_id
+
+
+'''
++-----------+--------------+------+-----+---------+-------+
+| Field     | Type         | Null | Key | Default | Extra |
++-----------+--------------+------+-----+---------+-------+
+| id        | varchar(36)  | NO   | PRI | NULL    |       |
+| tenant_id | varchar(255) | YES  | MUL | NULL    |       |
+| resource  | varchar(255) | YES  |     | NULL    |       |
+| limit     | int(11)      | YES  |     | NULL    |       |
++-----------+--------------+------+-----+---------+-------+
+'''
+class QuarkQuota(object):
+    def __init__(self, id, tenant_id, limit=65, resource='ports_per_network'):
+        self.id = id
+        self.tenant_id = tenant_id
+        self.limit = limit
+        self.resource = resource
+
 
 class QuarkDnsNameserver(object):
     def __init__(self, id, ip, subnet_id, created_at, tenant_id):

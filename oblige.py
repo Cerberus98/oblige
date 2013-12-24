@@ -15,6 +15,7 @@ from utils import to_mac_range
 from utils import make_offset_lengths
 from utils import mysqlize
 from utils import get_config
+from utils import paginate_query
 
 class Oblige(object):
     def __init__(self):
@@ -25,7 +26,7 @@ class Oblige(object):
                 
         conn = MySQLdb.connect(host = "localhost",
                                user = "root",
-                               passwd = self.dbpw,
+                               #passwd = self.dbpw,
                                db = "melange")
         cursor = conn.cursor()
         if self.debug:
@@ -240,6 +241,7 @@ class Oblige(object):
         self.quark_ip_policies = {}
         self.quark_ip_policy_rules = {}
         self.quark_nvp_stuff = {}
+        self.quark_quotas = {}
         self.policy_ids = {}
         self.interface_network = {}
         self.interface_ip = {}
@@ -250,8 +252,8 @@ class Oblige(object):
             time.time() - self.start_time))
         
         quark_conn = MySQLdb.connect(host = "localhost",
-                                     user = "root",
-                                     passwd = self.dbpw)
+                                     user = "root") #,
+                                     #passwd = self.dbpw)
         print("Initializing quark cursor")
         quark_cursor = quark_conn.cursor()
         print("Dropping quark")
@@ -261,7 +263,7 @@ class Oblige(object):
         print("Using quark")
         quark_cursor.execute("use quark")
         print("Creating quark schema")
-        quark_schema = open("__schema_2__.sql").read()
+        quark_schema = open("__schema__.sql").read()
         quark_cursor.execute(quark_schema)
         quark_cursor.close()
         quark_conn.close()
@@ -272,11 +274,26 @@ class Oblige(object):
         networks = {}
         cell_regex = re.compile("\w{3}-\w{1}\d{4}")
         m = 0
+        prv_rax = quark.QuarkNetwork(id='11111111-1111-1111-1111-111111111111',
+                                     tenant_id='rackspace',
+                                     created_at=datetime.utcnow(),
+                                     name='private',
+                                     max_allocation=None,
+                                     network_plugin='UNMANAGED',
+                                     ipam_strategy='BOTH')
+        
+        pub_rax = quark.QuarkNetwork(id='00000000-0000-0000-0000-000000000000',
+                                     tenant_id='rackspace',
+                                     created_at=datetime.utcnow(),
+                                     name='public',
+                                     max_allocation=None,
+                                     network_plugin='UNMANAGED',
+                                     ipam_strategy='BOTH_REQUIRED')
+
+        self.quark_networks.update({prv_rax.id: prv_rax})
+        self.quark_networks.update({pub_rax.id: pub_rax})
         for block_id, block in self.ip_blocks.iteritems():
             netplugin = 'NVP'
-            if cell_regex.match(block.tenant_id):
-                print("\tRackspace tenant: {}".format(block.tenant_id))
-                netplugin = 'UNMANAGED'
             if _br(block.network_id) not in networks:
                 networks[_br(block.network_id)] = {
                         "tenant_id": block.tenant_id,
@@ -297,26 +314,79 @@ class Oblige(object):
                     name=cache_net["name"],
                     max_allocation=cache_net["max_allocation"],
                     created_at=networks[_br(net_id)]["created_at"],
-                    network_plugin=cache_net["network_plugin"])
+                    network_plugin=cache_net["network_plugin"],
+                    ipam_strategy="ANY")
             self.quark_networks[q_network.id] = q_network
             m += 1
         for block_id, block in self.ip_blocks.iteritems():
+            isdone = False
             if not block.allocatable_ip_counter:
                 block.allocatable_ip_counter = netaddr.IPNetwork(block.cidr).first
-            self.quark_subnets.update({block.id: quark.QuarkSubnet(
-                    id=block.id,
-                    name=block.network_name,
-                    tenant_id=block.tenant_id,
-                    created_at=block.created_at,
-                    network_id=_br(block.network_id),
-                    _cidr=block.cidr,
-                    first_ip=netaddr.IPNetwork(block.cidr).first,
-                    last_ip=netaddr.IPNetwork(block.cidr).last,
-                    ip_version=netaddr.IPNetwork(block.cidr).version,
-                    ip_policy_id=block.policy_id,
-                    next_auto_assign_ip=block.allocatable_ip_counter,
-                    tag_association_uuid=None,
-                    do_not_use=block.omg_do_not_use)})
+            if block.tenant_id not in self.quark_quotas:
+                self.quark_quotas.update({block.tenant_id: quark.QuarkQuota(
+                        id=str(uuid4()),
+                        limit=block.max_allocation,
+                        tenant_id=block.tenant_id)})
+            else:
+                if block.max_allocation > self.quark_quotas[block.tenant_id].limit:
+                    self.quark_quotas.update({block.tenant_id: quark.QuarkQuota(
+                            id=str(uuid4()),
+                            limit=block.max_allocation,
+                            tenant_id=block.tenant_id)})
+            if cell_regex.match(block.tenant_id):
+                if block.network_name == 'private':
+                    self.quark_subnets.update({block.id: quark.QuarkSubnet(
+                            id=block.id,
+                            name=block.network_name,
+                            tenant_id=block.tenant_id,
+                            created_at=block.created_at,
+                            network_id='11111111-1111-1111-1111-111111111111',
+                            _cidr=block.cidr,
+                            first_ip=netaddr.IPNetwork(block.cidr).first,
+                            last_ip=netaddr.IPNetwork(block.cidr).last,
+                            ip_version=netaddr.IPNetwork(block.cidr).version,
+                            ip_policy_id=block.policy_id,
+                            next_auto_assign_ip=block.allocatable_ip_counter,
+                            tag_association_uuid=None,
+                            do_not_use=0)})
+                    isdone = True
+                elif block.network_name == 'public':
+                    self.quark_subnets.update({block.id: quark.QuarkSubnet(
+                            id=block.id,
+                            name=block.network_name,
+                            tenant_id=block.tenant_id,
+                            created_at=block.created_at,
+                            network_id='00000000-0000-0000-0000-000000000000',
+                            _cidr=block.cidr,
+                            first_ip=netaddr.IPNetwork(block.cidr).first,
+                            last_ip=netaddr.IPNetwork(block.cidr).last,
+                            ip_version=netaddr.IPNetwork(block.cidr).version,
+                            ip_policy_id=block.policy_id,
+                            next_auto_assign_ip=block.allocatable_ip_counter,
+                            tag_association_uuid=None,
+                            do_not_use=0)})
+                    isdone = True
+                else:
+                    print("rackspace tenant name {} not in ['public','private'] for ip_block {}".
+                            format(block.network_name, block.tenant_id))
+                #self.quark_subnets.update({block.id: quark.QuarkSubnet(
+                #    id=block.id,
+                #    name=
+            if not isdone:
+                self.quark_subnets.update({block.id: quark.QuarkSubnet(
+                        id=block.id,
+                        name=block.network_name,
+                        tenant_id=block.tenant_id,
+                        created_at=block.created_at,
+                        network_id=_br(block.network_id),
+                        _cidr=block.cidr,
+                        first_ip=netaddr.IPNetwork(block.cidr).first,
+                        last_ip=netaddr.IPNetwork(block.cidr).last,
+                        ip_version=netaddr.IPNetwork(block.cidr).version,
+                        ip_policy_id=block.policy_id,
+                        next_auto_assign_ip=block.allocatable_ip_counter,
+                        tag_association_uuid=None,
+                        do_not_use=block.omg_do_not_use)})
             if block.dns1: 
                 self.quark_dns_nameservers.update({block.id: quark.QuarkDnsNameserver(
                     id=str(uuid4()),
@@ -337,7 +407,7 @@ class Oblige(object):
                     self.policy_ids[block.policy_id] = {}
                 self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
             else:
-                print("Block lacks policy: {}".format(block.id))
+                print("Block lacks policy (this is bad): {}".format(block.id))
                 #pass
         # add routes:
         for block in self.ip_blocks.values():
@@ -603,17 +673,14 @@ class Oblige(object):
             `max_allocation`,
             `network_plugin`) 
         VALUES """
-        #  TODO TODO
-        # if network is public or snet -> network_plugin == UNMANAGED
-        # else network_plugin == NVP
         for record in self.quark_networks.values():
             m += 1
             record = mysqlize(record)
-            query += "({0},{1},{2},{3},'{4}',{5},{6}),\n".format(record.id,
+            query += "({0},{1},{2},{3},{4},{5},{6}),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
-                                                   'ANY',  # default ANY strategy
+                                                   record.ipam_strategy,
                                                    record.max_allocation,
                                                    record.network_plugin)
         query = query.rstrip(',\n')
@@ -642,10 +709,11 @@ class Oblige(object):
             `device_owner`,
             `bridge`)
         VALUES """
+        all_records = []
         for record in self.port_cache.values():
             record = mysqlize(record)
             m += 1
-            query += "({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}),\n".format(
+            all_records.append("({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}),\n".format(
                     record.id,
                     record.tenant_id,
                     record.created_at,
@@ -656,11 +724,14 @@ class Oblige(object):
                     record.mac_address,
                     record.device_id,
                     record.device_owner,
-                    record.bridge) # TODO come back to this
-        query = query.rstrip(',\n')
-        with open('quark_ports.sql', 'w') as f:
-            f.write(query)
-        cursor.execute(query)
+                    record.bridge)) # TODO come back to this
+        chunks = paginate_query(all_records)
+        for i, chunk in enumerate(chunks):
+            chunk_query = query + chunk
+            chunk_query = chunk_query.rstrip(',\n')
+            with open('quark_ports_{}.sql'.format(i), 'w') as f:
+                f.write(chunk_query)
+            cursor.execute(chunk_query)
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m)) 
    
@@ -1005,6 +1076,29 @@ class Oblige(object):
             len(self.quark_ip_policy_rules)))
 
 
+    def insert_quotas(self, cursor):
+        print("Inserting quotas...")
+        query = """
+        INSERT
+        INTO quark_quotas (
+            `id`,
+            `tenant_id`,
+            `limit`,
+            `resource`)
+        VALUES """
+        for tenant_id, quota in self.quark_quotas.iteritems():
+            record = mysqlize(quota)
+            query += "({0},{1},{2},{3}),\n".format(
+                    record.id,
+                    record.tenant_id,
+                    record.limit,
+                    record.resource)
+        query = query.rstrip(',\n')
+        cursor.execute(query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
+            len(self.quark_ip_policy_rules)))
+
+
     def migrates(self):
         self.migrate_networks()
         self.migrate_ips()
@@ -1017,7 +1111,7 @@ class Oblige(object):
     def inserts(self):
         conn = MySQLdb.connect(host = "localhost",
                            user = "root",
-                           passwd = self.dbpw,
+                           #passwd = self.dbpw,
                            db = "quark")
         conn.autocommit(True)
         cursor = conn.cursor()
@@ -1033,6 +1127,7 @@ class Oblige(object):
         self.insert_routes(cursor)
         self.insert_quark_dns_nameservers(cursor)
         self.insert_ip_policy_rules(cursor)
+        self.insert_quotas(cursor)
         cursor.close()
         conn.close()
 

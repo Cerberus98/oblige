@@ -3,6 +3,38 @@ import datetime # need the type
 import ConfigParser as cfgp
 import os
 import math
+import sys
+
+def paginate_query(all_records):
+    """return a list of strings less than max_byte_size each for mysql consumption"""
+    avg = sum([len(all_records[i]) for i in range(100)])/100
+    total_byte_size = avg * len(all_records) #sys.getsizeof(all_records)
+    max_byte_size = 15000000
+    records = len(all_records)
+    avg_record_bytes = total_byte_size / records
+    records_per_chunk = int(math.ceil(max_byte_size / avg_record_bytes))
+    chunks = []
+    start_mark = 0
+    end_mark = int(records_per_chunk)
+    #print("\t\tRecords per chunk: {}".format(records_per_chunk))
+    #print("\t\tRecords: {}".format(records))
+    #print("\t\tavg_record_bytes: {}".format(avg_record_bytes))
+    #print("\t\ttotal_byte_size: {}".format(total_byte_size))
+    if end_mark >= records:
+        chunks.append("".join(all_records))
+    else:
+        while start_mark < records:
+            if start_mark + records_per_chunk > all_records:
+                chunks.append("".join(all_records[start_mark:]))
+                start_mark = end_mark
+                end_mark += records_per_chunk
+            else:
+                chunks.append("".join(all_records[start_mark:end_mark]))
+                start_mark = end_mark
+                end_mark += records_per_chunk
+    return chunks
+
+
 
 def get_config():
     possible_configs = [os.path.expanduser('~/.oblige_config'),
