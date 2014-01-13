@@ -789,7 +789,7 @@ class Oblige(object):
         m = 0
         # this giant query needs to be broken down into bite-sized chunks
         # make a list of the strings for insertion then send them off
-        query_head = """
+        query = """
         INSERT
         INTO quark_ip_addresses (
             `id`,
@@ -821,20 +821,16 @@ class Oblige(object):
                     record._deallocated,
                     record.deallocated_at,
                     record.allocated_at))
-        query_size = current_stop = 50000
-        records_handled = 0
+        chunks = paginate_query(all_records)
         n = 0
-        while records_handled < len(all_records):
-            if len(all_records) < current_stop:
-                current_stop = len(all_records)
-            current_block = "".join(all_records[records_handled:current_stop])
-            current_stop += query_size
-            n += 1
-            with open('quark_ip_addresses_{}.sql'.format(n), 'w') as f:
-                f.write(query_head + current_block.rstrip(',\n'))
-            cursor.execute(query_head + current_block.rstrip(',\n'))
-            records_handled += query_size
-        print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
+        for i, chunk in enumerate(chunks):
+            chunk_query = query + chunk
+            chunk_query = chunk_query.rstrip(',\n')
+            with open('quark_ip_addresses_{}.sql'.format(i), 'w') as f:
+                f.write(chunk_query)
+            cursor.execute(chunk_query)
+        print("\tDone, {:.2f} sec, {} migrated.".format(
+            time.time() - self.start_time, m))
 
 
     def insert_port_ip_assn(self, cursor):
