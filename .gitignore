@@ -1,3 +1,8 @@
+# project-specific
+quark_*
+null*
+dump*
+
 *.py[cod]
 
 # C extensions
