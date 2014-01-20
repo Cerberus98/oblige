@@ -16,10 +16,6 @@ def paginate_query(all_records):
     chunks = []
     start_mark = 0
     end_mark = int(records_per_chunk)
-    #print("\t\tRecords per chunk: {}".format(records_per_chunk))
-    #print("\t\tRecords: {}".format(records))
-    #print("\t\tavg_record_bytes: {}".format(avg_record_bytes))
-    #print("\t\ttotal_byte_size: {}".format(total_byte_size))
     if end_mark >= records:
         chunks.append("".join(all_records))
     else:
@@ -34,8 +30,6 @@ def paginate_query(all_records):
                 end_mark += records_per_chunk
     return chunks
 
-
-
 def get_config():
     possible_configs = [os.path.expanduser('~/.oblige_config'),
                         '.oblige_config']
@@ -44,7 +38,6 @@ def get_config():
     if len(config.sections()) < 1:
         return None
     return config
-
 
 def mysqlize(some_object):
     members = [attr for attr in dir(some_object)
@@ -130,6 +123,23 @@ def make_offset_lengths(octets, offsets):
     tmp_all = consolidate_ranges(tmp_ranges)
     return ranges_to_offset_lengths(tmp_all)
 
+def make_cidr(outer_cidr, offset, length):
+    #if offset < 0 and length + offset == 4:
+        #print("Noob")
+    network = netaddr.IPNetwork(outer_cidr)
+    first_ip = netaddr.IPAddress(int(network.first) + offset)
+    last_ip = netaddr.IPAddress(int(first_ip) + (length - 1))
+    cidr = netaddr.iprange_to_cidrs(first_ip, last_ip)
+    if len(cidr) > 1:
+        #print("Network: {}".format(network))
+        #print("Offset:  {}".format(offset))
+        #print("Length:  {}".format(length))
+        #print cidr
+    # TODO: confirm that offset/lengths like -8192/8196 desire default policies
+        return None
+        #raise Exception
+    return str(cidr[0])
+
 def offset_to_range(offset):
     return (offset[0], offset[0] + offset[1])
 
@@ -178,27 +188,27 @@ def ranges_to_offset_lengths(ranges):
         retvals.append((r[0], r[1] - r[0]))
     return retvals
 
-def to_mac_range(val):
-    cidr_parts = val.split("/")
-    prefix = cidr_parts[0]
-    prefix = prefix.replace(':', '')
-    prefix = prefix.replace('-', '')
-    prefix_length = len(prefix)
-    if prefix_length < 6 or prefix_length > 12:
-        r = "6>len({0}) || len({0})>12 len == {1}]".format(val, prefix_length)
-        raise ValueError(r)
-    diff = 12 - len(prefix)
-    if len(cidr_parts) > 1:
-        mask = int(cidr_parts[1])
-    else:
-        mask = 48 - diff * 4
-    mask_size = 1 << (48 - mask)
-    prefix = "%s%s" % (prefix, "0" * diff)
-    try:
-        cidr = "%s/%s" % (str(netaddr.EUI(prefix)).replace("-", ":"), mask)
-    except netaddr.AddrFormatError as e:
-        r = "{0} raised netaddr.AddrFormatError: ".format(prefix)
-        r += "{0}... ignoring.".format(e.message)
-        raise netaddr.AddrFormatError(r)
-    prefix_int = int(prefix, base=16)
-    return cidr, prefix_int, prefix_int + mask_size
+#def to_mac_range(val):
+#    cidr_parts = val.split("/")
+#    prefix = cidr_parts[0]
+#    prefix = prefix.replace(':', '')
+#    prefix = prefix.replace('-', '')
+#    prefix_length = len(prefix)
+#    if prefix_length < 6 or prefix_length > 12:
+#        r = "6>len({0}) || len({0})>12 len == {1}]".format(val, prefix_length)
+#        raise ValueError(r)
+#    diff = 12 - len(prefix)
+#    if len(cidr_parts) > 1:
+#        mask = int(cidr_parts[1])
+#    else:
+#        mask = 48 - diff * 4
+#    mask_size = 1 << (48 - mask)
+#    prefix = "%s%s" % (prefix, "0" * diff)
+#    try:
+#        cidr = "%s/%s" % (str(netaddr.EUI(prefix)).replace("-", ":"), mask)
+#    except netaddr.AddrFormatError as e:
+#        r = "{0} raised netaddr.AddrFormatError: ".format(prefix)
+#        r += "{0}... ignoring.".format(e.message)
+#        raise netaddr.AddrFormatError(r)
+#    prefix_int = int(prefix, base=16)
+#    return cidr, prefix_int, prefix_int + mask_size

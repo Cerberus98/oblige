@@ -85,15 +85,14 @@ CREATE TABLE `quark_ip_policy` (
 -- Table structure for table `quark_ip_policy_rules`
 --
 
-DROP TABLE IF EXISTS `quark_ip_policy_rules`;
+DROP TABLE IF EXISTS `quark_ip_policy_cidrs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `quark_ip_policy_rules` (
+CREATE TABLE `quark_ip_policy_cidrs` (
   `id` varchar(36) NOT NULL,
   `created_at` datetime DEFAULT NULL,
   `ip_policy_id` varchar(36) DEFAULT NULL,
-  `offset` int(11) DEFAULT NULL,
-  `length` int(11) DEFAULT NULL,
+  `cidr` varchar(36) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ip_policy_id` (`ip_policy_id`),
   CONSTRAINT `quark_ip_policy_rules_ibfk_1` FOREIGN KEY (`ip_policy_id`) REFERENCES `quark_ip_policy` (`id`) ON DELETE CASCADE
