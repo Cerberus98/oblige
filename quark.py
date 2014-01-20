@@ -168,9 +168,8 @@ class QuarkIpPolicy(object):
         self.description = description
 
 class QuarkIpPolicyRule(object):
-    def __init__(self, id, ip_policy_id, created_at, offset, length):
+    def __init__(self, id, ip_policy_id, created_at, cidr):
         self.id = id
         self.ip_policy_id = ip_policy_id
         self.created_at = created_at
-        self.offset = offset
-        self.length = length
+        self.cidr = cidr

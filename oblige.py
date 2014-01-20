@@ -13,6 +13,7 @@ from utils import _br  # removes leading 'br-'s
 from utils import translate_netmask
 from utils import to_mac_range
 from utils import make_offset_lengths
+from utils import make_cidr
 from utils import mysqlize
 from utils import get_config
 from utils import paginate_query
@@ -239,7 +240,7 @@ class Oblige(object):
         self.quark_dns_nameservers = {}
         self.quark_routes = {}
         self.quark_ip_policies = {}
-        self.quark_ip_policy_rules = {}
+        self.quark_ip_policy_cidrs = {}
         self.quark_nvp_stuff = {}
         self.quark_quotas = {}
         self.policy_ids = {}
@@ -649,13 +650,17 @@ class Oblige(object):
                 self.quark_ip_policies.update({policy_uuid: q_ip_policy})
                 # q_ip_policy.subnets.append(self.quark_subnets[block_id])
                 for rule in policy_rules:
-                    q_ip_policy_rule = quark.QuarkIpPolicyRule(
+                    outer_cidr = self.ip_blocks[block_id].cidr
+                    _cidr = make_cidr(outer_cidr, rule[0], rule[1])
+                    if _cidr:
+                        q_ip_policy_cidr = quark.QuarkIpPolicyRule(
                                       id=str(uuid4()),
-                                      offset=rule[0],
-                                      length=rule[1],
+                                      #offset=rule[0],
+                                      #length=rule[1],
+                                      cidr=_cidr,
                                       ip_policy_id=policy_uuid,
                                       created_at=min_created_at)
-                    self.quark_ip_policy_rules.update({q_ip_policy.id: q_ip_policy_rule})
+                        self.quark_ip_policy_cidrs.update({q_ip_policy.id: q_ip_policy_cidr})
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -1051,25 +1056,23 @@ class Oblige(object):
         print("Inserting ip policy rules...")
         query = """
         INSERT
-        INTO quark_ip_policy_rules (
+        INTO quark_ip_policy_cidrs (
             `id`,
             `ip_policy_id`,
             `created_at`,
-            `offset`,
-            `length`)
+            `cidr`)
         VALUES """
-        for rule_id, rule in self.quark_ip_policy_rules.iteritems():
+        for rule_id, rule in self.quark_ip_policy_cidrs.iteritems():
             record = mysqlize(rule)
-            query += "({0},{1},{2},{3},{4}),\n".format(
+            query += "({0},{1},{2},{3}),\n".format(
                     record.id,
                     record.ip_policy_id,
                     record.created_at,
-                    record.offset,
-                    record.length)
+                    record.cidr)
         query = query.rstrip(',\n')
         cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
-            len(self.quark_ip_policy_rules)))
+            len(self.quark_ip_policy_cidrs)))
 
 
     def insert_quotas(self, cursor):
@@ -1080,7 +1083,7 @@ class Oblige(object):
             `id`,
             `tenant_id`,
             `limit`,
-            `resource`)
+            `resource`) 
         VALUES """
         for tenant_id, quota in self.quark_quotas.iteritems():
             record = mysqlize(quota)
@@ -1092,7 +1095,7 @@ class Oblige(object):
         query = query.rstrip(',\n')
         cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
-            len(self.quark_ip_policy_rules)))
+            len(self.quark_ip_policy_cidrs)))
 
 
     def migrates(self):
