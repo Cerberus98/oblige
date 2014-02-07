@@ -480,18 +480,18 @@ class Oblige(object):
                     deallocated = True
                     deallocated_at = address.deallocated_at
                 ip_address = netaddr.IPAddress(address.address)
-                q_ip =  quark.QuarkIpAddress(
-                        id=address.id,
-                        created_at=address.created_at,
-                        used_by_tenant_id=address.used_by_tenant_id,
-                        network_id=_br(block.network_id),
-                        subnet_id=block.id,
-                        version=ip_address.version,
-                        address_readable=address.address,
-                        deallocated_at=deallocated_at,
-                        _deallocated=deallocated,
-                        address=int(ip_address.ipv6()),
-                        allocated_at=block.updated_at)
+                q_ip = quark.QuarkIpAddress(
+                       id=address.id,
+                       created_at=address.created_at,
+                       used_by_tenant_id=address.used_by_tenant_id,
+                       network_id=_br(block.network_id),
+                       subnet_id=block.id,
+                       version=ip_address.version,
+                       address_readable=address.address,
+                       deallocated_at=deallocated_at,
+                       _deallocated=deallocated,
+                       address=int(ip_address.ipv6()),
+                       allocated_at=block.updated_at)
                 self.quark_ip_addresses.update({address.id: q_ip})
                 if interface_id not in self.interface_ip:
                     self.interface_ip[interface_id] = set()
