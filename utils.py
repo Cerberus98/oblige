@@ -130,13 +130,13 @@ def make_cidr(outer_cidr, offset, length):
     first_ip = netaddr.IPAddress(int(network.first) + offset)
     last_ip = netaddr.IPAddress(int(first_ip) + (length - 1))
     cidr = netaddr.iprange_to_cidrs(first_ip, last_ip)
-    if len(cidr) > 1:
+    #if len(cidr) > 1:
         #print("Network: {}".format(network))
         #print("Offset:  {}".format(offset))
         #print("Length:  {}".format(length))
         #print cidr
     # TODO: confirm that offset/lengths like -8192/8196 desire default policies
-        return None
+    #    return None
         #raise Exception
     return str(cidr[0])
 
