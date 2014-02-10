@@ -517,10 +517,13 @@ class Oblige(object):
                 # this is a rackspace interface
                 if the_block.name == "public":
                     bridge_name = "publicnet"
+                    network_id = '00000000-0000-0000-0000-000000000000'
                 elif the_block.name == "private":
                     bridge_name = "servicenet"
+                    network_id = '11111111-1111-1111-1111-111111111111'
                 else:
-                    raise Exception("NOOOooooo!")
+                    raise Exception("NOOOooooo! Block name not public or private:"
+                            " block name = {}".format(the_block.name))
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
