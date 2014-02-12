@@ -8,10 +8,22 @@ import sys
 
 def create_schema():
     from quark.db import models as quarkmodels
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    username = "root"
+    password = ""
+    location = "localhost"
+    dbname = "quark"
+    engine = create_engine("mysql://{0}:{1}@{2}/{3}".
+            format(username, password, location, dbname),
+            echo=True)
+
+    Base = declarative_base(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
-    quarkmodels.BASEV2.metadata.drop_all(neutron_engine)
-    quarkmodels.BASEV2.metadata.create_all(neutron_engine)
+    quarkmodels.BASEV2.metadata.drop_all(engine)
+    quarkmodels.BASEV2.metadata.create_all(engine)
 
 def paginate_query(all_records):
     """return a list of strings less than max_byte_size each for mysql consumption"""
