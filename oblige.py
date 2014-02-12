@@ -2,9 +2,9 @@ import re
 import sys
 import MySQLdb
 import time
-import melange
+import melange_objs as melange
 import netaddr
-import quark
+import quark_objs as quark
 
 from datetime import datetime, timedelta
 from uuid import uuid4
@@ -17,6 +17,8 @@ from utils import make_cidr
 from utils import mysqlize
 from utils import get_config
 from utils import paginate_query
+from utils import create_schema
+
 
 class Oblige(object):
     def __init__(self):

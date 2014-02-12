@@ -5,6 +5,14 @@ import os
 import math
 import sys
 
+
+def create_schema():
+    from quark.db import models as quarkmodels
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    quarkmodels.BASEV2.metadata.drop_all(neutron_engine)
+    quarkmodels.BASEV2.metadata.create_all(neutron_engine)
+
 def paginate_query(all_records):
     """return a list of strings less than max_byte_size each for mysql consumption"""
     avg = sum([len(all_records[i]) for i in range(100)])/100
