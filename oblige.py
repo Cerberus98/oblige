@@ -2,9 +2,9 @@ import re
 import sys
 import MySQLdb
 import time
-import melange
+import melange_objs as melange
 import netaddr
-import quark
+import quark_objs as quark
 
 from datetime import datetime, timedelta
 from uuid import uuid4
@@ -17,6 +17,8 @@ from utils import make_cidr
 from utils import mysqlize
 from utils import get_config
 from utils import paginate_query
+from utils import create_schema
+
 
 class Oblige(object):
     def __init__(self):
@@ -24,12 +26,17 @@ class Oblige(object):
         self.dbpw = config.get('oblige', 'dbpw')
         self.start_time = time.time()
         self.debug = False
+        
+        # should use sqlalchemy, not the connection
+        create_schema()
                 
         conn = MySQLdb.connect(host = "localhost",
                                user = "root",
                                #passwd = self.dbpw,
                                db = "melange")
         cursor = conn.cursor()
+
+        
         if self.debug:
             cursor.execute("describe interfaces")
             desc = cursor.fetchall()
@@ -252,24 +259,7 @@ class Oblige(object):
         print("\tInitialization complete in {:.2f} seconds.".format(
             time.time() - self.start_time))
         
-        quark_conn = MySQLdb.connect(host = "localhost",
-                                     user = "root") #,
-                                     #passwd = self.dbpw)
-        print("Initializing quark cursor")
-        quark_cursor = quark_conn.cursor()
-        print("Dropping quark")
-        quark_cursor.execute("drop database if exists quark")
-        print("Creating quark")
-        quark_cursor.execute("create database quark")
-        print("Using quark")
-        quark_cursor.execute("use quark")
-        print("Creating quark schema")
-        quark_schema = open("__schema__.sql").read()
-        quark_cursor.execute(quark_schema)
-        quark_cursor.close()
-        quark_conn.close()
         
-
     def migrate_networks(self):
         print("Migrating networks...")
         networks = {}
