@@ -5,6 +5,11 @@ import os
 import math
 import sys
 
+def handle_null(value):
+    if not value or value == 0 or value == "0":
+        return False
+    return True
+
 
 def create_schema():
     from quark.db import models as quarkmodels

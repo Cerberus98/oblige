@@ -18,6 +18,7 @@ from utils import mysqlize
 from utils import get_config
 from utils import paginate_query
 from utils import create_schema
+from utils import handle_null
 
 from quark.db import models as needed_models
 from quark.db import api as needed_api
@@ -75,9 +76,9 @@ class Oblige(object):
                 ip_block_id = ip[3],
                 used_by_tenant_id = ip[4],
                 created_at = ip[5],  # 6 = updated_at
-                marked_for_deallocation = ip[7],
+                marked_for_deallocation = handle_null(ip[7]),
                 deallocated_at = ip[8],
-                allocated = ip[9])})
+                allocated = handle_null(ip[9]))})
         print("Got {} ip_addresses...".format(len(self.ip_addresses)))
 
         if self.debug:
@@ -156,11 +157,11 @@ class Oblige(object):
                 dns1=ip_block[8],
                 dns2=ip_block[9],
                 allocatable_ip_counter=ip_block[10],
-                is_full=ip_block[11],
+                is_full=handle_null(ip_block[11]),
                 policy_id=ip_block[12],
                 parent_id=ip_block[13],
                 network_name=ip_block[14],
-                omg_do_not_use=ip_block[15],
+                omg_do_not_use=handle_null(ip_block[15]),
                 max_allocation=ip_block[16])})
         print("Got {} ip_blocks...".format(len(self.ip_blocks)))
 
