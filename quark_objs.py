@@ -65,13 +65,13 @@ class QuarkTag(object):
         self.tag = tag
 
 class QuarkNetwork(object):
-    def __init__(self, id, tenant_id, created_at, name, max_allocation,
+    def __init__(self, id, tenant_id, created_at, name,
             network_plugin, ipam_strategy):
         self.id = id
         self.tenant_id = tenant_id
         self.created_at = created_at
         self.name = name
-        self.max_allocation = max_allocation  # TODO: not in ERD
+        # self.max_allocation = max_allocation  # TODO: not in ERD
         self.network_plugin = network_plugin
         self.ipam_strategy = ipam_strategy
 
