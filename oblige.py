@@ -19,6 +19,9 @@ from utils import get_config
 from utils import paginate_query
 from utils import create_schema
 
+from quark.db import models as needed_models
+from quark.db import api as needed_api
+
 
 class Oblige(object):
     def __init__(self):
@@ -269,7 +272,7 @@ class Oblige(object):
                                      tenant_id='rackspace',
                                      created_at=datetime.utcnow(),
                                      name='private',
-                                     max_allocation=None,
+                                     #max_allocation=None,
                                      network_plugin='UNMANAGED',
                                      ipam_strategy='BOTH')
         
@@ -277,7 +280,7 @@ class Oblige(object):
                                      tenant_id='rackspace',
                                      created_at=datetime.utcnow(),
                                      name='public',
-                                     max_allocation=None,
+                                     #max_allocation=None,
                                      network_plugin='UNMANAGED',
                                      ipam_strategy='BOTH_REQUIRED')
 
@@ -289,7 +292,7 @@ class Oblige(object):
                 networks[_br(block.network_id)] = {
                         "tenant_id": block.tenant_id,
                         "name": block.network_name,
-                        "max_allocation": block.max_allocation,
+                        #"max_allocation": block.max_allocation,
                         "created_at": block.created_at,
                         "network_plugin": netplugin}
             elif _br(block.network_id) in networks:
@@ -303,7 +306,7 @@ class Oblige(object):
             q_network = quark.QuarkNetwork(id=net_id,
                     tenant_id=cache_net["tenant_id"],
                     name=cache_net["name"],
-                    max_allocation=cache_net["max_allocation"],
+                    #max_allocation=cache_net["max_allocation"],
                     created_at=networks[_br(net_id)]["created_at"],
                     network_plugin=cache_net["network_plugin"],
                     ipam_strategy="ANY")
@@ -480,8 +483,9 @@ class Oblige(object):
                        address_readable=address.address,
                        deallocated_at=deallocated_at,
                        _deallocated=deallocated,
-                       address=int(ip_address.ipv6()),
+                       address=netaddr.strategy.ipv6.str_to_int(ip_address.ipv6().format(dialect=netaddr.ipv6_verbose)),
                        allocated_at=block.updated_at)
+                print(q_ip.address)
                 self.quark_ip_addresses.update({address.id: q_ip})
                 if interface_id not in self.interface_ip:
                     self.interface_ip[interface_id] = set()
@@ -668,18 +672,17 @@ class Oblige(object):
             `created_at`, 
             `name`,
             `ipam_strategy`,
-            `max_allocation`,
             `network_plugin`) 
         VALUES """
         for record in self.quark_networks.values():
             m += 1
             record = mysqlize(record)
-            query += "({0},{1},{2},{3},{4},{5},{6}),\n".format(record.id,
+            query += "({0},{1},{2},{3},{4},{5}),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
                                                    record.ipam_strategy,
-                                                   record.max_allocation,
+                                                   #record.max_allocation,
                                                    record.network_plugin)
         query = query.rstrip(',\n')
         with open('quark_networks.sql', 'w') as f:
@@ -1119,7 +1122,7 @@ class Oblige(object):
         self.insert_routes(cursor)
         self.insert_quark_dns_nameservers(cursor)
         self.insert_ip_policy_rules(cursor)
-        self.insert_quotas(cursor)
+        #self.insert_quotas(cursor)
         cursor.close()
         conn.close()
 
