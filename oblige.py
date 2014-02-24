@@ -486,7 +486,6 @@ class Oblige(object):
                        _deallocated=deallocated,
                        address=netaddr.strategy.ipv6.str_to_int(ip_address.ipv6().format(dialect=netaddr.ipv6_verbose)),
                        allocated_at=block.updated_at)
-                print(q_ip.address)
                 self.quark_ip_addresses.update({address.id: q_ip})
                 if interface_id not in self.interface_ip:
                     self.interface_ip[interface_id] = set()
