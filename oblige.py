@@ -466,13 +466,8 @@ class Oblige(object):
                     #               "network id: {0} != {1}"
                     #               .format(self.interface_network[interface_id],
                     #                       _br(block.network_id)))
-                deallocated = False
-                deallocated_at = None
-                # If marked for deallocation
-                #       put it into the quark ip table as deallocated
-                if address.marked_for_deallocation == 1:
-                    deallocated = True
-                    deallocated_at = address.deallocated_at
+
+                deallocated = not address.allocated or address.marked_for_deallocation
                 ip_address = netaddr.IPAddress(address.address)
                 q_ip = quark.QuarkIpAddress(
                        id=address.id,
@@ -482,7 +477,7 @@ class Oblige(object):
                        subnet_id=block.id,
                        version=ip_address.version,
                        address_readable=address.address,
-                       deallocated_at=deallocated_at,
+                       deallocated_at=address.deallocated_at,
                        _deallocated=deallocated,
                        address=netaddr.strategy.ipv6.str_to_int(ip_address.ipv6().format(dialect=netaddr.ipv6_verbose)),
                        allocated_at=block.updated_at)
