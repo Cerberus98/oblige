@@ -1071,7 +1071,7 @@ class Oblige(object):
         print("Inserting quotas...")
         query = """
         INSERT
-        INTO quark_quotas (
+        INTO quotas (
             `id`,
             `tenant_id`,
             `limit`,
@@ -1118,7 +1118,7 @@ class Oblige(object):
         self.insert_routes(cursor)
         self.insert_quark_dns_nameservers(cursor)
         self.insert_ip_policy_rules(cursor)
-        #self.insert_quotas(cursor)
+        self.insert_quotas(cursor)
         cursor.close()
         conn.close()
 

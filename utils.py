@@ -12,10 +12,12 @@ def handle_null(value):
 
 
 def create_schema():
+    from neutron.db import quota_db
     from quark.db import models as quarkmodels
-    from sqlalchemy.ext.declarative import declarative_base
+    from quark.drivers import optimized_nvp_driver
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.declarative import declarative_base
     username = "root"
     password = ""
     location = "localhost"
@@ -26,7 +28,7 @@ def create_schema():
 
     Base = declarative_base(engine)
     Session = sessionmaker(bind=engine)
-    session = Session()
+    #session = Session()
     quarkmodels.BASEV2.metadata.drop_all(engine)
     quarkmodels.BASEV2.metadata.create_all(engine)
 
