@@ -22,6 +22,7 @@ from utils import handle_null
 
 from quark.db import models as needed_models
 from quark.db import api as needed_api
+from quark import quota_driver
 
 
 class Oblige(object):
