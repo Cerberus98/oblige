@@ -5,6 +5,7 @@ import time
 import melange_objs as melange
 import netaddr
 import quark_objs as quark
+import logging
 
 from datetime import datetime, timedelta
 from uuid import uuid4
@@ -23,24 +24,39 @@ from utils import handle_null
 from quark.db import models as needed_models
 from quark.db import api as needed_api
 
+# should use sqlalchemy, not the connection
+
+LOG = logging.getLogger(__name__)
+logging.basicConfig(format='%(funcName)s: %(lineno)s - %(message)s',
+        filename='oblige_debug.log', level=logging.DEBUG)
+
 
 class Oblige(object):
     def __init__(self):
         config = get_config()
-        self.dbpw = config.get('oblige', 'dbpw')
+        self.db_source = {} # melange
+        self.db_destination = {} # quark
+        self.db_source['host'] = config.get('source', 'host')
+        self.db_source['user'] = config.get('source', 'user')
+        self.db_source['pass'] = config.get('source', 'pass')
+        self.db_source['db'] = config.get('source', 'db')
+        self.db_destination['host'] = config.get('destination', 'host')
+        self.db_destination['user'] = config.get('destination', 'user')
+        self.db_destination['pass'] = config.get('destination', 'pass')
+        self.db_destination['db'] = config.get('destination', 'db')
+        
         self.start_time = time.time()
         self.debug = False
         
-        # should use sqlalchemy, not the connection
-        create_schema()
                 
-        conn = MySQLdb.connect(host = "localhost",
-                               user = "root",
-                               #passwd = self.dbpw,
-                               db = "melange")
+        create_schema(self.db_destination)
+        conn = MySQLdb.connect(host = self.db_source['host'],
+                               user = self.db_source['user'],
+                               passwd = self.db_source['pass'],
+                               db = self.db_source['db'])
+
         cursor = conn.cursor()
 
-        
         if self.debug:
             cursor.execute("describe interfaces")
             desc = cursor.fetchall()
@@ -273,7 +289,6 @@ class Oblige(object):
                                      tenant_id='rackspace',
                                      created_at=datetime.utcnow(),
                                      name='private',
-                                     #max_allocation=None,
                                      network_plugin='UNMANAGED',
                                      ipam_strategy='BOTH')
         
@@ -281,42 +296,39 @@ class Oblige(object):
                                      tenant_id='rackspace',
                                      created_at=datetime.utcnow(),
                                      name='public',
-                                     #max_allocation=None,
                                      network_plugin='UNMANAGED',
                                      ipam_strategy='BOTH_REQUIRED')
 
         self.quark_networks.update({prv_rax.id: prv_rax})
         self.quark_networks.update({pub_rax.id: pub_rax})
+        
         for block_id, block in self.ip_blocks.iteritems():
             netplugin = 'NVP'
             if _br(block.network_id) not in networks:
                 networks[_br(block.network_id)] = {
                         "tenant_id": block.tenant_id,
                         "name": block.network_name,
-                        #"max_allocation": block.max_allocation,
                         "created_at": block.created_at,
                         "network_plugin": netplugin}
             elif _br(block.network_id) in networks:
                 if networks[_br(block.network_id)]["created_at"] > block.created_at:
                     networks[_br(block.network_id)]["created_at"] = block.created_at
-            #else:  # how was this ever firing?
-            #    print("Bad: {} != {}".format(networks[_br(block.network_id)]["tenant_id"],
-            #        block.tenant_id))
         for net_id, net in networks.iteritems():
             cache_net = networks[net_id]
             q_network = quark.QuarkNetwork(id=net_id,
                     tenant_id=cache_net["tenant_id"],
                     name=cache_net["name"],
-                    #max_allocation=cache_net["max_allocation"],
                     created_at=networks[_br(net_id)]["created_at"],
                     network_plugin=cache_net["network_plugin"],
                     ipam_strategy="ANY")
             self.quark_networks[q_network.id] = q_network
             m += 1
+        
         for block_id, block in self.ip_blocks.iteritems():
             isdone = False
             if not block.allocatable_ip_counter:
                 block.allocatable_ip_counter = netaddr.IPNetwork(block.cidr).first
+            
             if block.tenant_id not in self.quark_quotas:
                 self.quark_quotas.update({block.tenant_id: quark.QuarkQuota(
                         id=str(uuid4()),
@@ -328,8 +340,9 @@ class Oblige(object):
                             id=str(uuid4()),
                             limit=block.max_allocation,
                             tenant_id=block.tenant_id)})
+            
             if cell_regex.match(block.tenant_id):
-                if block.network_name == 'private':
+                if block.network_name and 'private' in block.network_name:
                     self.quark_subnets.update({block.id: quark.QuarkSubnet(
                             id=block.id,
                             name=block.network_name,
@@ -345,7 +358,7 @@ class Oblige(object):
                             tag_association_uuid=None,
                             do_not_use=0)})
                     isdone = True
-                elif block.network_name == 'public':
+                elif block.network_name and 'public' in block.network_name:
                     self.quark_subnets.update({block.id: quark.QuarkSubnet(
                             id=block.id,
                             name=block.network_name,
@@ -361,7 +374,7 @@ class Oblige(object):
                             tag_association_uuid=None,
                             do_not_use=0)})
                     isdone = True
-                else:
+                if not isdone:
                     print("rackspace tenant name {} not in ['public','private'] for ip_block {}".
                             format(block.network_name, block.tenant_id))
                 #self.quark_subnets.update({block.id: quark.QuarkSubnet(
@@ -495,12 +508,13 @@ class Oblige(object):
         cell_regex = re.compile("\w{3}-\w{1}\d{4}")
         for interface_id, interface in self.interfaces.iteritems():
             if interface_id not in self.interface_network:
-                # print("No network for {}".format(interface_id))
+                LOG.critical("No network for {}".format(interface_id))
                 n += 1
                 continue
             m += 1
             network_id = self.interface_network[interface_id]
             the_block = self.quark_networks[network_id]
+            debug = False
             bridge_name = None
             if cell_regex.match(the_block.tenant_id):
                 # this is a rackspace interface
@@ -652,7 +666,10 @@ class Oblige(object):
                                       cidr=_cidr,
                                       ip_policy_id=policy_uuid,
                                       created_at=min_created_at)
-                        self.quark_ip_policy_cidrs.update({q_ip_policy.id: q_ip_policy_cidr})
+                        if q_ip_policy.id in self.quark_ip_policy_cidrs.keys():
+                            self.quark_ip_policy_cidrs[q_ip_policy.id].append(q_ip_policy_cidr)
+                        else:
+                            self.quark_ip_policy_cidrs.update({q_ip_policy.id: [q_ip_policy_cidr]})
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -818,7 +835,6 @@ class Oblige(object):
                     record.deallocated_at,
                     record.allocated_at))
         chunks = paginate_query(all_records)
-        n = 0
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
             chunk_query = chunk_query.rstrip(',\n')
@@ -943,6 +959,7 @@ class Oblige(object):
     def insert_mac_addresses(self, cursor):
         print("Inserting mac addressess...")
         m = 0
+        all_records = []
         query = """
         INSERT
         INTO quark_mac_addresses (
@@ -954,36 +971,49 @@ class Oblige(object):
             `deallocated_at`)
         VALUES """
         for mac_range_id, macs in self.quark_mac_addresses.iteritems():
-            mac_range = mysqlize(self.mac_address_ranges[mac_range_id])
-            # There is only one mac range so this is fine:
-            cursor.execute("""
-            INSERT
-            INTO quark_mac_address_ranges (
-                `id`,
-                `created_at`,
-                `cidr`,
-                `first_address`,
-                `last_address`,
-                `next_auto_assign_mac`)
-            VALUES ({0},{1},{2},{3},{4},{5})""".format(
-                mac_range.id,
-                mac_range.created_at,
-                mac_range.cidr,
-                mac_range.first_address,
-                mac_range.last_address,
-                mac_range.next_auto_assign_mac))
+            try:
+                mac_range = self.mac_address_ranges[mac_range_id]
+                # There is only one mac range so this is fine:
+                cursor.execute("""
+                INSERT
+                INTO quark_mac_address_ranges (
+                    `id`,
+                    `created_at`,
+                    `cidr`,
+                    `first_address`,
+                    `last_address`,
+                    `next_auto_assign_mac`)
+                VALUES ('{0}','{1}','{2}',{3},{4},{5})""".format(
+                    mac_range.id,
+                    mac_range.created_at,
+                    mac_range.cidr,
+                    mac_range.first_address,
+                    mac_range.last_address,
+                    mac_range.next_auto_assign_mac))
+            except MySQLdb.Error, e:
+                try:
+                    print "MySQL Error [%d]: %s" % (e.args[0], e.args[1])
+                except IndexError:
+                    print "MySQL Error: %s" % str(e)
             for mac in macs:
                 m += 1
-                mac = mysqlize(mac)
-                query += "({0},{1},{2},{3},'0',{5}),\n".format(
+                # mac = mysqlize(mac)
+                all_records.append("('{0}','{1}',{2},'{3}',0,'{5}'),\n".format(
                         mac.tenant_id,
                         mac.created_at,
                         mac.address,
                         mac.mac_address_range_id,
                         mac.deallocated,
-                        mac.deallocated_at)
-        query = query.rstrip(',\n')
-        cursor.execute(query)
+                        mac.deallocated_at))
+        chunks = paginate_query(all_records)
+        for i, chunk in enumerate(chunks):
+            chunk_query = query + chunk
+            chunk_query = chunk_query.rstrip(',\n')
+            with open('quark_macs_{}.sql'.format(i), 'w') as f:
+                f.write(chunk_query)
+            cursor.execute(chunk_query)
+        #query = query.rstrip(',\n')
+        #cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -1053,13 +1083,14 @@ class Oblige(object):
             `created_at`,
             `cidr`)
         VALUES """
-        for rule_id, rule in self.quark_ip_policy_cidrs.iteritems():
-            record = mysqlize(rule)
-            query += "({0},{1},{2},{3}),\n".format(
-                    record.id,
-                    record.ip_policy_id,
-                    record.created_at,
-                    record.cidr)
+        for rule_id, rules in self.quark_ip_policy_cidrs.iteritems():
+            for rule in rules:
+                record = mysqlize(rule)
+                query += "({0},{1},{2},{3}),\n".format(
+                        record.id,
+                        record.ip_policy_id,
+                        record.created_at,
+                        record.cidr)
         query = query.rstrip(',\n')
         cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
@@ -1086,7 +1117,7 @@ class Oblige(object):
         query = query.rstrip(',\n')
         cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
-            len(self.quark_ip_policy_cidrs)))
+            len(self.quark_quotas)))
 
 
     def migrates(self):
@@ -1099,10 +1130,10 @@ class Oblige(object):
 
 
     def inserts(self):
-        conn = MySQLdb.connect(host = "localhost",
-                           user = "root",
-                           #passwd = self.dbpw,
-                           db = "quark")
+        conn = MySQLdb.connect(host = self.db_destination['host'],
+                           user = self.db_destination['user'],
+                           passwd = self.db_destination['pass'],
+                           db = self.db_destination['db'])
         conn.autocommit(True)
         cursor = conn.cursor()
         # these have to be in this order or the key constriants fail
@@ -1117,7 +1148,7 @@ class Oblige(object):
         self.insert_routes(cursor)
         self.insert_quark_dns_nameservers(cursor)
         self.insert_ip_policy_rules(cursor)
-        #self.insert_quotas(cursor)
+        self.insert_quotas(cursor)
         cursor.close()
         conn.close()
 
@@ -1130,3 +1161,4 @@ if __name__ == "__main__":
     o.inserts()
     print("-" * 40)
     print("TOTAL TIME: {}".format(timedelta(seconds=time.time()-o.start_time)))
+    logging.shutdown()

@@ -1,3 +1,5 @@
+from utils import stringer
+
 class QuarkIpAddress(object):
     def __init__(self, id, used_by_tenant_id, created_at, address_readable,
             address, subnet_id, network_id, version, _deallocated,
@@ -13,11 +15,18 @@ class QuarkIpAddress(object):
         self._deallocated = _deallocated
         self.deallocated_at = deallocated_at
         self.allocated_at = allocated_at  # TODO
+    
+    def __str__(self):
+        return stringer(self)
+
 
 class QuarkPortIpAddressAssociation(object):
     def __init__(self, port_id, ip_address_id):
         self.port_id = port_id
         self.ip_address_id = ip_address_id
+
+    def __str__(self):
+        return stringer(self)
 
 class QuarkPort(object):
     def __init__(self, id, name, tenant_id, created_at, network_id, mac_address,
@@ -35,6 +44,9 @@ class QuarkPort(object):
         self.ip_addresses = []
         self.bridge = bridge
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkMacAddress(object):
     def __init__(self, id, tenant_id, created_at, address, mac_address_range_id,
             deallocated, deallocated_at):
@@ -46,6 +58,9 @@ class QuarkMacAddress(object):
         self.deallocated = deallocated
         self.deallocated_at = deallocated_at
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkMacAddressRange(object):
     def __init__(self, id, created_at, cidr, first_address, last_address,
             next_auto_assign_mac):
@@ -56,6 +71,9 @@ class QuarkMacAddressRange(object):
         self.last_address = last_address
         self.next_auto_assign_mac = next_auto_assign_mac
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkTag(object):
     def __init__(self, id, tenant_id, created_at, association_uuid, tag):
         self.id = id
@@ -64,6 +82,9 @@ class QuarkTag(object):
         self.association_uuid = association_uuid
         self.tag = tag
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkNetwork(object):
     def __init__(self, id, tenant_id, created_at, name,
             network_plugin, ipam_strategy):
@@ -71,15 +92,20 @@ class QuarkNetwork(object):
         self.tenant_id = tenant_id
         self.created_at = created_at
         self.name = name
-        # self.max_allocation = max_allocation  # TODO: not in ERD
         self.network_plugin = network_plugin
         self.ipam_strategy = ipam_strategy
+
+    def __str__(self):
+        return stringer(self)
 
 class QuarkTagAssociation(object):
     def __init__(self, id, created_at, discriminator):
         self.id = id
         self.created_at = created_at
         self.discriminator = discriminator
+
+    def __str__(self):
+        return stringer(self)
 
 class QuarkSubnet(object):
     def __init__(self, id, tenant_id, created_at, network_id, _cidr, first_ip,
@@ -101,23 +127,19 @@ class QuarkSubnet(object):
         self.enable_dhcp = False  # TODO
         self.segment_id = tenant_id
 
+    def __str__(self):
+        return stringer(self)
 
-'''
-+-----------+--------------+------+-----+---------+-------+
-| Field     | Type         | Null | Key | Default | Extra |
-+-----------+--------------+------+-----+---------+-------+
-| id        | varchar(36)  | NO   | PRI | NULL    |       |
-| tenant_id | varchar(255) | YES  | MUL | NULL    |       |
-| resource  | varchar(255) | YES  |     | NULL    |       |
-| limit     | int(11)      | YES  |     | NULL    |       |
-+-----------+--------------+------+-----+---------+-------+
-'''
+
 class QuarkQuota(object):
     def __init__(self, id, tenant_id, limit=65, resource='ports_per_network'):
         self.id = id
         self.tenant_id = tenant_id
         self.limit = limit
         self.resource = resource
+
+    def __str__(self):
+        return stringer(self)
 
 
 class QuarkDnsNameserver(object):
@@ -128,6 +150,9 @@ class QuarkDnsNameserver(object):
         self.created_at = created_at  # TODO: Not in ERD
         self.tenant_id = tenant_id  # TODO: Not in ERD
         self.tag_association_uuid = None
+
+    def __str__(self):
+        return stringer(self)
 
 class QuarkNvpDriverLswitch(object):
     def __init__(self, id, nvp_id, network_id, display_name, port_count,
@@ -142,11 +167,17 @@ class QuarkNvpDriverLswitch(object):
         self.segment_id = segment_id
         self.segment_connector = segment_connector
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkNvpDriverLswitchPort(object):
     def __init__(self, port_id, switch_id, created_at):
         self.port_id = port_id
         self.switch_id = switch_id
         self.created_at = created_at
+
+    def __str__(self):
+        return stringer(self)
 
 class QuarkRoute(object):
     def __init__(self, id, tenant_id, created_at, cidr, gateway, subnet_id,
@@ -159,6 +190,9 @@ class QuarkRoute(object):
         self.subnet_id = subnet_id
         self.tag_association_uuid = tag_association_uuid
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkIpPolicy(object):
     def __init__(self, id, tenant_id, created_at, name, description):
         self.id = id
@@ -167,9 +201,16 @@ class QuarkIpPolicy(object):
         self.name = name
         self.description = description
 
+    def __str__(self):
+        return stringer(self)
+
 class QuarkIpPolicyRule(object):
     def __init__(self, id, ip_policy_id, created_at, cidr):
         self.id = id
         self.ip_policy_id = ip_policy_id
         self.created_at = created_at
         self.cidr = cidr
+
+    def __str__(self):
+        return stringer(self)
+

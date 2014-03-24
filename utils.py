@@ -4,26 +4,37 @@ import ConfigParser as cfgp
 import os
 import math
 import sys
+import logging
+LOG = logging.getLogger(__name__)
+
+def stringer(obj):
+    maxwidth = 27
+    retstr = "\n"
+    members = [attr for attr in dir(obj)
+            if not callable(attr) and not attr.startswith("__")]
+    if members:
+        for member in members:
+            retstr += "{0}: {1}\n".format(member.rjust(maxwidth),
+                                          getattr(obj, member))
+    return retstr
 
 def handle_null(value):
     if not value or value == 0 or value == "0":
         return False
     return True
 
-
-def create_schema():
+def create_schema(db_destination):
     from quark.db import models as quarkmodels
     from sqlalchemy.ext.declarative import declarative_base
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    username = "root"
-    password = ""
-    location = "localhost"
-    dbname = "quark"
+    username = db_destination['user']
+    password = db_destination['pass']
+    location = db_destination['host']
+    dbname = db_destination['db']
     engine = create_engine("mysql://{0}:{1}@{2}/{3}".
             format(username, password, location, dbname),
             echo=True)
-
     Base = declarative_base(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -34,7 +45,7 @@ def paginate_query(all_records):
     """return a list of strings less than max_byte_size each for mysql consumption"""
     avg = sum([len(all_records[i]) for i in range(100)])/100
     total_byte_size = avg * len(all_records) #sys.getsizeof(all_records)
-    max_byte_size = 15000000
+    max_byte_size = 20000000
     records = len(all_records)
     avg_record_bytes = total_byte_size / records
     records_per_chunk = int(math.ceil(max_byte_size / avg_record_bytes))
@@ -104,7 +115,8 @@ def translate_netmask(netmask, destination):
         print("No destination given.")
     try:
         a = netaddr.IPAddress(netmask)
-        return str(netaddr.IPNetwork("{0}/{1}".format(destination, 32 - int(math.log(2 ** 32 - a.value, 2)))))  # noqa
+        return str(netaddr.IPNetwork("{0}/{1}".format(destination,
+            32 - int(math.log(2 ** 32 - a.value, 2)))))  # noqa
     except Exception as e:
         print("Could not generate cidr, netmask {0} destination {1}".
                 format(netmask, destination))
@@ -212,28 +224,3 @@ def ranges_to_offset_lengths(ranges):
     for r in ranges:
         retvals.append((r[0], r[1] - r[0]))
     return retvals
-
-#def to_mac_range(val):
-#    cidr_parts = val.split("/")
-#    prefix = cidr_parts[0]
-#    prefix = prefix.replace(':', '')
-#    prefix = prefix.replace('-', '')
-#    prefix_length = len(prefix)
-#    if prefix_length < 6 or prefix_length > 12:
-#        r = "6>len({0}) || len({0})>12 len == {1}]".format(val, prefix_length)
-#        raise ValueError(r)
-#    diff = 12 - len(prefix)
-#    if len(cidr_parts) > 1:
-#        mask = int(cidr_parts[1])
-#    else:
-#        mask = 48 - diff * 4
-#    mask_size = 1 << (48 - mask)
-#    prefix = "%s%s" % (prefix, "0" * diff)
-#    try:
-#        cidr = "%s/%s" % (str(netaddr.EUI(prefix)).replace("-", ":"), mask)
-#    except netaddr.AddrFormatError as e:
-#        r = "{0} raised netaddr.AddrFormatError: ".format(prefix)
-#        r += "{0}... ignoring.".format(e.message)
-#        raise netaddr.AddrFormatError(r)
-#    prefix_int = int(prefix, base=16)
-#    return cidr, prefix_int, prefix_int + mask_size
