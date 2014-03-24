@@ -1,2 +1,11 @@
-[oblige]
-dbpw=
+[source]
+user=root
+pass=password
+host=192.168.0.1
+db=melange
+
+[destination]
+user=root
+pass=password
+host=192.168.0.1
+db=neutron

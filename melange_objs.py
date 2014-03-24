@@ -1,3 +1,6 @@
+from utils import stringer
+
+
 class IpBlock(object):
     def __init__(self, id, network_id, cidr, created_at, _type, tenant_id,
             gateway, dns1, dns2, allocatable_ip_counter, is_full, policy_id,
@@ -20,6 +23,9 @@ class IpBlock(object):
         self.max_allocation = max_allocation
         self.updated_at = updated_at
 
+    def __str__(self):
+        return stringer(self)
+
 class Interface(object):
     def __init__(self, id, vif_id_on_device, device_id, tenant_id, created_at):
         self.id = id
@@ -28,12 +34,18 @@ class Interface(object):
         self.tenant_id = tenant_id
         self.created_at = created_at
 
+    def __str__(self):
+        return stringer(self)
+
 class IpOctet(object):
     def __init__(self, id, octet, policy_id, created_at):
         self.id = id
         self.octet = octet
         self.policy_id = policy_id
         self.created_at = created_at
+
+    def __str__(self):
+        return stringer(self)
 
 class IpRange(object):
     def __init__(self, id, offset, length, policy_id, created_at):
@@ -43,6 +55,9 @@ class IpRange(object):
         self.policy_id = policy_id
         self.created_at = created_at
 
+    def __str__(self):
+        return stringer(self)
+
 class Policy(object):
     def __init__(self, id, name, tenant_id, description, created_at):
         self.id = id
@@ -50,6 +65,9 @@ class Policy(object):
         self.tenant_id = tenant_id
         self.description = description
         self.created_at = created_at
+
+    def __str__(self):
+        return stringer(self)
 
 class IpRoute(object):
     def __init__(self, id, destination, netmask, gateway, source_block_id,
@@ -61,6 +79,9 @@ class IpRoute(object):
         self.source_block_id = source_block_id
         self.created_at = created_at
 
+    def __str__(self):
+        return stringer(self)
+
 class AllocatableMac(object):
     def __init__(self, id, mac_address_range_id, address, created_at):
         self.id = id
@@ -68,12 +89,18 @@ class AllocatableMac(object):
         self.address = address
         self.created_at = created_at
 
+    def __str__(self):
+        return stringer(self)
+
 class MacAddressRange(object):
     def __init__(self, id, cidr, next_address, created_at):
         self.id = id
         self.cidr = cidr
         self.next_address = next_address
         self.created_at = created_at
+
+    def __str__(self):
+        return stringer(self)
 
 class MacAddress(object):
     def __init__(self, id, address, mac_address_range_id, interface_id,
@@ -84,6 +111,9 @@ class MacAddress(object):
         self.interface_id = interface_id
         self.created_at = created_at
         self.updated_at = updated_at
+
+    def __str__(self):
+        return stringer(self)
 
 class IpAddress(object):
     def __init__(self, id, address, interface_id, ip_block_id,
@@ -98,3 +128,7 @@ class IpAddress(object):
         self.marked_for_deallocation = marked_for_deallocation
         self.deallocated_at = deallocated_at
         self.allocated = allocated
+
+    def __str__(self):
+        return stringer(self)
+
