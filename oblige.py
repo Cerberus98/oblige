@@ -21,11 +21,6 @@ from utils import paginate_query
 from utils import create_schema
 from utils import handle_null
 
-from quark.db import models as needed_models
-from quark.db import api as needed_api
-
-# should use sqlalchemy, not the connection
-
 LOG = logging.getLogger(__name__)
 logging.basicConfig(format='%(funcName)s: %(lineno)s - %(message)s',
         filename='oblige_debug.log', level=logging.DEBUG)
@@ -47,8 +42,6 @@ class Oblige(object):
         
         self.start_time = time.time()
         self.debug = False
-        
-                
         create_schema(self.db_destination)
         conn = MySQLdb.connect(host = self.db_source['host'],
                                user = self.db_source['user'],
@@ -62,7 +55,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from interfaces")
         ifaces = cursor.fetchall()
         self.interfaces = {}
@@ -80,7 +72,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from ip_addresses")
         self.ip_addresses = {}
         ipaddrs = cursor.fetchall()
@@ -102,7 +93,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from mac_addresses")
         self.mac_addresses = {} 
         macaddrs = cursor.fetchall()
@@ -122,7 +112,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from mac_address_ranges")
         self.mac_address_ranges = {}
         mars = cursor.fetchall()
@@ -139,7 +128,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from allocatable_macs")
         self.allocatable_macs = {}
         allmacs = cursor.fetchall()
@@ -156,7 +144,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from ip_blocks")
         ipb = cursor.fetchall()
         self.ip_blocks = {}
@@ -186,7 +173,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from ip_routes")
         self.ip_routes = {}
         iprs = cursor.fetchall()
@@ -205,7 +191,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from policies")
         self.policies = {}
         pols = cursor.fetchall()
@@ -223,7 +208,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from ip_octets")
         self.ip_octets = {}
         ipoc = cursor.fetchall()
@@ -240,7 +224,6 @@ class Oblige(object):
             desc = cursor.fetchall()
             for i, v in enumerate(desc):
                 print("{}: {}".format(i, v[0]))
-                print
         cursor.execute("select * from ip_ranges")
         self.ip_ranges = {}
         iprns = cursor.fetchall()
@@ -530,7 +513,7 @@ class Oblige(object):
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
-                port_id = "TODO"  # TODO don't know how to get on my level son
+                port_id = "TODO"  # TODO can't get
             q_port = quark.QuarkPort(
                     id=interface_id,
                     name=None, # shouldn't matter (Dobby)
@@ -673,7 +656,7 @@ class Oblige(object):
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
-    def insert_networks(self, cursor):
+    def insert_networks(self, cursor, connection):
         print("Inserting networks...")
         m = 0
         query = """
@@ -697,14 +680,13 @@ class Oblige(object):
                                                    #record.max_allocation,
                                                    record.network_plugin)
         query = query.rstrip(',\n')
-        with open('quark_networks.sql', 'w') as f:
-            f.write(query)
         cursor.execute(query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m))
 
 
-    def insert_ports(self, cursor):
+    def insert_ports(self, cursor, connection):
         print("Inserting ports...")
         m = 0
         query = """
@@ -742,14 +724,13 @@ class Oblige(object):
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
             chunk_query = chunk_query.rstrip(',\n')
-            with open('quark_ports_{}.sql'.format(i), 'w') as f:
-                f.write(chunk_query)
             cursor.execute(chunk_query)
+            connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m)) 
    
 
-    def insert_subnets(self, cursor):
+    def insert_subnets(self, cursor, connection):
         print("Inserting subnets...")
         m = 0
         query = """
@@ -790,14 +771,13 @@ class Oblige(object):
                     record.ip_policy_id,
                     record.enable_dhcp,
                     record.segment_id)
-        with open("quark_subnets.sql", 'w') as f:
-            f.write(query)
         cursor.execute(query.rstrip(',\n'))
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m))
 
 
-    def insert_ip_addresses(self, cursor):
+    def insert_ip_addresses(self, cursor, connection):
         print("Inserting ip addresses...")
         m = 0
         # this giant query needs to be broken down into bite-sized chunks
@@ -838,14 +818,13 @@ class Oblige(object):
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
             chunk_query = chunk_query.rstrip(',\n')
-            with open('quark_ip_addresses_{}.sql'.format(i), 'w') as f:
-                f.write(chunk_query)
             cursor.execute(chunk_query)
+            connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m))
 
 
-    def insert_port_ip_assn(self, cursor):
+    def insert_port_ip_assn(self, cursor, connection):
         print("Inserting port_ip_address_associations...")
         m = 0
         query_head = """
@@ -865,15 +844,14 @@ class Oblige(object):
             if len(all_records) < current_stop:
                 current_stop = len(all_records)
             current_block = "".join(all_records[records_handled:current_stop])
-            with open('quark_port_ip_assn.sql', 'w') as f:
-                f.write(query_head + current_block.rstrip(',\n'))
             current_stop += query_size
             cursor.execute(query_head + current_block.rstrip(',\n'))
+            connection.commit()
             records_handled += query_size
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
     
 
-    def insert_policies(self, cursor):
+    def insert_policies(self, cursor, connection):
         print("Inserting policies...")
         m = 0
         query = """
@@ -894,13 +872,12 @@ class Oblige(object):
                     record.tenant_id,
                     record.description,
                     record.created_at)
-        with open('quark_ip_policies.sql', 'w') as f:
-            f.write(query.rstrip(',\n'))
         cursor.execute(query.rstrip(',\n'))
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
    
 
-    def insert_lswitches(self, cursor):
+    def insert_lswitches(self, cursor, connection):
         print("Inserting nvp driver lswitches...")
         m = 0
         query = """
@@ -944,19 +921,17 @@ class Oblige(object):
                             port.port_id, switch.id, port.created_at)
         query = query.rstrip(',\n')
         port_query = port_query.rstrip(',\n')
-        with open("quark_nvp_lswitch.sql", "w") as f:
-            f.write(query)
-        with open("quark_nvp_ports.sql", "w") as f:
-            f.write(port_query)
         try:
             cursor.execute(query)
+            connection.commit()
             cursor.execute(port_query)
+            connection.commit()
         except Exception as e:
             print("\tError inserting nvp ports: {}".format(e))
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
    
 
-    def insert_mac_addresses(self, cursor):
+    def insert_mac_addresses(self, cursor, connection):
         print("Inserting mac addressess...")
         m = 0
         all_records = []
@@ -990,6 +965,7 @@ class Oblige(object):
                     mac_range.first_address,
                     mac_range.last_address,
                     mac_range.next_auto_assign_mac))
+                connection.commit()
             except MySQLdb.Error, e:
                 try:
                     print "MySQL Error [%d]: %s" % (e.args[0], e.args[1])
@@ -1009,15 +985,14 @@ class Oblige(object):
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
             chunk_query = chunk_query.rstrip(',\n')
-            with open('quark_macs_{}.sql'.format(i), 'w') as f:
-                f.write(chunk_query)
             cursor.execute(chunk_query)
+            connection.commit()
         #query = query.rstrip(',\n')
         #cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
-    def insert_routes(self, cursor):
+    def insert_routes(self, cursor, connection):
         print("Inserting routes...")
         query = """
         INSERT
@@ -1042,11 +1017,12 @@ class Oblige(object):
                     record.tag_association_uuid)
         query = query.rstrip(',\n')
         cursor.execute(query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
             len(self.quark_routes)))
 
 
-    def insert_quark_dns_nameservers(self, cursor):
+    def insert_quark_dns_nameservers(self, cursor, connection):
         print("Inserting dns nameservers...")
         query = """
         INSERT
@@ -1069,11 +1045,12 @@ class Oblige(object):
                     record.tag_association_uuid)
         query = query.rstrip(',\n')
         cursor.execute(query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
             len(self.quark_dns_nameservers)))
 
 
-    def insert_ip_policy_rules(self, cursor):
+    def insert_ip_policy_rules(self, cursor, connection):
         print("Inserting ip policy rules...")
         query = """
         INSERT
@@ -1093,15 +1070,16 @@ class Oblige(object):
                         record.cidr)
         query = query.rstrip(',\n')
         cursor.execute(query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
             len(self.quark_ip_policy_cidrs)))
 
 
-    def insert_quotas(self, cursor):
+    def insert_quotas(self, cursor, connection):
         print("Inserting quotas...")
         query = """
         INSERT
-        INTO quark_quotas (
+        INTO quotas (
             `id`,
             `tenant_id`,
             `limit`,
@@ -1116,6 +1094,7 @@ class Oblige(object):
                     record.resource)
         query = query.rstrip(',\n')
         cursor.execute(query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
             len(self.quark_quotas)))
 
@@ -1134,21 +1113,21 @@ class Oblige(object):
                            user = self.db_destination['user'],
                            passwd = self.db_destination['pass'],
                            db = self.db_destination['db'])
-        conn.autocommit(True)
+        #conn.autocommit(True)
         cursor = conn.cursor()
         # these have to be in this order or the key constriants fail
-        self.insert_networks(cursor)
-        self.insert_ports(cursor)
-        self.insert_policies(cursor)
-        self.insert_subnets(cursor)
-        self.insert_ip_addresses(cursor)
-        self.insert_port_ip_assn(cursor)
-        self.insert_lswitches(cursor)
-        self.insert_mac_addresses(cursor)
-        self.insert_routes(cursor)
-        self.insert_quark_dns_nameservers(cursor)
-        self.insert_ip_policy_rules(cursor)
-        self.insert_quotas(cursor)
+        self.insert_networks(cursor, conn)
+        self.insert_ports(cursor, conn)
+        self.insert_policies(cursor, conn)
+        self.insert_subnets(cursor, conn)
+        self.insert_ip_addresses(cursor, conn)
+        self.insert_port_ip_assn(cursor, conn)
+        self.insert_lswitches(cursor, conn)
+        self.insert_mac_addresses(cursor, conn)
+        self.insert_routes(cursor, conn)
+        self.insert_quark_dns_nameservers(cursor, conn)
+        self.insert_ip_policy_rules(cursor, conn)
+        self.insert_quotas(cursor, conn)
         cursor.close()
         conn.close()
 

@@ -5,6 +5,7 @@ import os
 import math
 import sys
 import logging
+import MySQLdb
 LOG = logging.getLogger(__name__)
 
 def stringer(obj):
@@ -23,23 +24,44 @@ def handle_null(value):
         return False
     return True
 
-def create_schema(db_destination):
-    from quark.db import models as quarkmodels
-    from sqlalchemy.ext.declarative import declarative_base
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    username = db_destination['user']
-    password = db_destination['pass']
-    location = db_destination['host']
-    dbname = db_destination['db']
-    engine = create_engine("mysql://{0}:{1}@{2}/{3}".
-            format(username, password, location, dbname),
-            echo=True)
-    Base = declarative_base(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    quarkmodels.BASEV2.metadata.drop_all(engine)
-    quarkmodels.BASEV2.metadata.create_all(engine)
+def create_schema(dest):
+    #from quark.db import models as quarkmodels
+    #from sqlalchemy.ext.declarative import declarative_base
+    #from sqlalchemy import create_engine
+    #from sqlalchemy.orm import sessionmaker
+    #username = db_destination['user']
+    #password = db_destination['pass']
+    #location = db_destination['host']
+    #dbname = db_destination['db']
+    #engine = create_engine("mysql://{0}:{1}@{2}/{3}".
+    #        format(username, password, location, dbname),
+    #        echo=True)
+    conn = MySQLdb.connect(host = dest['host'],
+                           user = dest['user'],
+                           passwd = dest['pass'],
+                           db = dest['db'])
+
+    cursor = conn.cursor() 
+    MYSQL_OPTION_MULTI_STATEMENTS_ON = 0
+    MYSQL_OPTION_MULTI_STATEMENTS_OFF = 1
+
+    conn.set_server_option(MYSQL_OPTION_MULTI_STATEMENTS_ON)
+    
+    schema = open("neutron_schema.sql").read()
+    cursor.execute(schema)
+    more = True
+    while more:
+        print cursor.fetchall()
+        more = cursor.nextset()
+    conn.commit()
+    conn.set_server_option(MYSQL_OPTION_MULTI_STATEMENTS_OFF)
+    cursor.close()
+    conn.close()
+    #Base = declarative_base(engine)
+    #Session = sessionmaker(bind=engine)
+    #session = Session()
+    #quarkmodels.BASEV2.metadata.drop_all(engine)
+    #quarkmodels.BASEV2.metadata.create_all(engine)
 
 def paginate_query(all_records):
     """return a list of strings less than max_byte_size each for mysql consumption"""
