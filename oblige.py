@@ -426,7 +426,7 @@ class Oblige(object):
         if gateway.version == 4:
             destination = '0.0.0.0/0'
         else:  # TODO not all of these will look like this RE: dobby
-            destination = '0:0:0:0:0:0:0:0/0'
+            destination = '::/0'
         self.quark_routes.update({block.id: quark.QuarkRoute(
             id=str(uuid4()),
             tag_association_uuid=None,
