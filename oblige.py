@@ -25,6 +25,10 @@ LOG = logging.getLogger(__name__)
 logging.basicConfig(format='%(funcName)s: %(lineno)s - %(message)s',
         filename='oblige_debug.log', level=logging.DEBUG)
 
+# TODO: paginate query all the inserts
+# TODO: remove the mysqlize calls
+# TODO: run times on all the DBs
+
 
 class Oblige(object):
     def __init__(self):
@@ -50,11 +54,6 @@ class Oblige(object):
 
         cursor = conn.cursor()
 
-        if self.debug:
-            cursor.execute("describe interfaces")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from interfaces")
         ifaces = cursor.fetchall()
         self.interfaces = {}
@@ -67,11 +66,6 @@ class Oblige(object):
                 created_at=interface[4])})
         print("Got {} interfaces...".format(len(self.interfaces)))
 
-        if self.debug:
-            cursor.execute("describe ip_addresses")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from ip_addresses")
         self.ip_addresses = {}
         ipaddrs = cursor.fetchall()
@@ -88,11 +82,6 @@ class Oblige(object):
                 allocated = handle_null(ip[9]))})
         print("Got {} ip_addresses...".format(len(self.ip_addresses)))
 
-        if self.debug:
-            cursor.execute("describe mac_addresses")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from mac_addresses")
         self.mac_addresses = {} 
         macaddrs = cursor.fetchall()
@@ -107,11 +96,6 @@ class Oblige(object):
             self.interfaces[mac[3]].mac_address = mac[1]
         print("Got {} mac_addresses...".format(len(self.mac_addresses)))
 
-        if self.debug:
-            cursor.execute("describe mac_address_ranges")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from mac_address_ranges")
         self.mac_address_ranges = {}
         mars = cursor.fetchall()
@@ -123,11 +107,6 @@ class Oblige(object):
                 created_at = mar[3])})
         print("Got {} mac_address_ranges...".format(len(self.mac_address_ranges)))
 
-        if self.debug:
-            cursor.execute("describe allocatable_macs")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from allocatable_macs")
         self.allocatable_macs = {}
         allmacs = cursor.fetchall()
@@ -139,11 +118,6 @@ class Oblige(object):
                 created_at = amac[3])})
         print("Got {} allocatable_macs...".format(len(self.allocatable_macs)))
 
-        if self.debug:
-            cursor.execute("describe ip_blocks")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from ip_blocks")
         ipb = cursor.fetchall()
         self.ip_blocks = {}
@@ -168,11 +142,6 @@ class Oblige(object):
                 max_allocation=ip_block[16])})
         print("Got {} ip_blocks...".format(len(self.ip_blocks)))
 
-        if self.debug:
-            cursor.execute("describe ip_routes")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from ip_routes")
         self.ip_routes = {}
         iprs = cursor.fetchall()
@@ -186,11 +155,6 @@ class Oblige(object):
                 created_at = ipr[5])})
         print("Got {} ip_routes...".format(len(self.ip_routes)))
 
-        if self.debug:
-            cursor.execute("describe policies")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from policies")
         self.policies = {}
         pols = cursor.fetchall()
@@ -203,11 +167,6 @@ class Oblige(object):
                 created_at = pol[4])})
         print("Got {} policies...".format(len(self.policies)))
 
-        if self.debug:
-            cursor.execute("describe ip_octets")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from ip_octets")
         self.ip_octets = {}
         ipoc = cursor.fetchall()
@@ -219,11 +178,6 @@ class Oblige(object):
                 created_at = ipo[3])})
         print("Got {} ip_octets...".format(len(self.ip_octets)))
 
-        if self.debug:
-            cursor.execute("describe ip_ranges")
-            desc = cursor.fetchall()
-            for i, v in enumerate(desc):
-                print("{}: {}".format(i, v[0]))
         cursor.execute("select * from ip_ranges")
         self.ip_ranges = {}
         iprns = cursor.fetchall()
@@ -358,11 +312,8 @@ class Oblige(object):
                             do_not_use=0)})
                     isdone = True
                 if not isdone:
-                    print("rackspace tenant name {} not in ['public','private'] for ip_block {}".
+                    LOG.critical("rackspace tenant name {} not in ['public','private'] for ip_block {}".
                             format(block.network_name, block.tenant_id))
-                #self.quark_subnets.update({block.id: quark.QuarkSubnet(
-                #    id=block.id,
-                #    name=
             if not isdone:
                 self.quark_subnets.update({block.id: quark.QuarkSubnet(
                         id=block.id,
@@ -398,8 +349,7 @@ class Oblige(object):
                     self.policy_ids[block.policy_id] = {}
                 self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
             else:
-                print("Block lacks policy (this is bad): {}".format(block.id))
-                #pass
+                LOG.critical("Block lacks policy (this is bad): {}".format(block.id))
         # add routes:
         for block in self.ip_blocks.values():
             if block.gateway:
@@ -425,7 +375,7 @@ class Oblige(object):
         destination = None
         if gateway.version == 4:
             destination = '0.0.0.0/0'
-        else:  # TODO not all of these will look like this RE: dobby
+        else:
             destination = '::/0'
         self.quark_routes.update({block.id: quark.QuarkRoute(
             id=str(uuid4()),
@@ -457,11 +407,9 @@ class Oblige(object):
                     self.interface_network[interface_id] = _br(block.network_id)
                 if interface_id in self.interface_network and\
                         self.interface_network[interface_id] != _br(block.network_id):
-                    pass  # TODO this?
-                    #print("Found interface with different "
-                    #               "network id: {0} != {1}"
-                    #               .format(self.interface_network[interface_id],
-                    #                       _br(block.network_id)))
+                    LOG.critical("Found interface with different network id: {0} != {1}"
+                                 .format(self.interface_network[interface_id],
+                                         _br(block.network_id)))
 
                 deallocated = not address.allocated or address.marked_for_deallocation
                 ip_address = netaddr.IPAddress(address.address)
@@ -475,7 +423,8 @@ class Oblige(object):
                        address_readable=address.address,
                        deallocated_at=address.deallocated_at,
                        _deallocated=deallocated,
-                       address=netaddr.strategy.ipv6.str_to_int(ip_address.ipv6().format(dialect=netaddr.ipv6_verbose)),
+                       address=netaddr.strategy.ipv6.str_to_int(
+                           ip_address.ipv6().format(dialect=netaddr.ipv6_verbose)),
                        allocated_at=block.updated_at)
                 self.quark_ip_addresses.update({address.id: q_ip})
                 if interface_id not in self.interface_ip:
@@ -513,7 +462,11 @@ class Oblige(object):
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
-                port_id = "TODO"  # TODO can't get
+                LOG.critical("interface.vif_id_on_device is NULL, "
+                             "tenant_id: {0} interface_id: {1}".format(
+                                 interface.tenant_id,
+                                 interface_id))
+                port_id = "TODO" 
             q_port = quark.QuarkPort(
                     id=interface_id,
                     name=None, # shouldn't matter (Dobby)
@@ -575,9 +528,9 @@ class Oblige(object):
             for mac_id, mac in self.mac_addresses.iteritems():
                 dealloc = False
                 if mac.interface_id not in self.interface_network:
-                    #print("mac.interface_id {} not in interface_network.".
-                    #        format(mac.interface_id))
-                    continue # TODO come back to this
+                    LOG.critical("mac.interface_id {} not in interface_network.".
+                                 format(mac.interface_id))
+                    continue
                     # dealloc = True
                 m += 1
                 tenant_id = self.interface_tenant[mac.interface_id]
@@ -587,8 +540,8 @@ class Oblige(object):
                         created_at=mac.created_at,
                         mac_address_range_id=mac_range.id,
                         address=mac.address,
-                        deallocated=dealloc,  # TODO
-                        deallocated_at=mac.updated_at)  # TODO
+                        deallocated=dealloc,
+                        deallocated_at=mac.updated_at)
                 if mac_range_id not in self.quark_mac_addresses:
                     self.quark_mac_addresses.update({mac_range_id: [q_mac]})
                 else:
@@ -621,7 +574,7 @@ class Oblige(object):
                 ran_created_at = datetime.utcnow()
             min_created_at = min([oct_created_at, ran_created_at])
             try:
-                policy_description = policy.description # TODO fix name/desc
+                policy_description = policy.description
             except Exception:
                 policy_description = None
             for block_id in policy_block_ids.keys():
@@ -635,17 +588,14 @@ class Oblige(object):
                         tenant_id=q_network.tenant_id,
                         description=policy_description or the_desc,
                         created_at=min_created_at,
-                        name=the_name)  # TODO
+                        name=the_name)
                 self.quark_ip_policies.update({policy_uuid: q_ip_policy})
-                # q_ip_policy.subnets.append(self.quark_subnets[block_id])
                 for rule in policy_rules:
                     outer_cidr = self.ip_blocks[block_id].cidr
                     _cidr = make_cidr(outer_cidr, rule[0], rule[1])
                     if _cidr:
                         q_ip_policy_cidr = quark.QuarkIpPolicyRule(
                                       id=str(uuid4()),
-                                      #offset=rule[0],
-                                      #length=rule[1],
                                       cidr=_cidr,
                                       ip_policy_id=policy_uuid,
                                       created_at=min_created_at)
@@ -677,7 +627,6 @@ class Oblige(object):
                                                    record.created_at,
                                                    record.name,
                                                    record.ipam_strategy,
-                                                   #record.max_allocation,
                                                    record.network_plugin)
         query = query.rstrip(',\n')
         cursor.execute(query)
@@ -715,11 +664,11 @@ class Oblige(object):
                     record.name,
                     record.admin_state_up,
                     record.network_id,
-                    record.backend_key, # TODO shouldnt be TODO
+                    record.backend_key,
                     record.mac_address,
                     record.device_id,
                     record.device_owner,
-                    record.bridge)) # TODO come back to this
+                    record.bridge))
         chunks = paginate_query(all_records)
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
@@ -780,8 +729,6 @@ class Oblige(object):
     def insert_ip_addresses(self, cursor, connection):
         print("Inserting ip addresses...")
         m = 0
-        # this giant query needs to be broken down into bite-sized chunks
-        # make a list of the strings for insertion then send them off
         query = """
         INSERT
         INTO quark_ip_addresses (
@@ -909,10 +856,10 @@ class Oblige(object):
                     switch.network_id,
                     switch.display_name,
                     switch.port_count,
-                    switch.transport_zone,  # TODO: isolated nets not NULL
+                    switch.transport_zone,
                     switch.transport_connector,
                     switch.segment_connector,
-                    switch.segment_id) # TODO: created_at add
+                    switch.segment_id)
             for port in ports:
                 if port.port_id != 'TODO':
                     m += 1
@@ -987,8 +934,6 @@ class Oblige(object):
             chunk_query = chunk_query.rstrip(',\n')
             cursor.execute(chunk_query)
             connection.commit()
-        #query = query.rstrip(',\n')
-        #cursor.execute(query)
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -1113,7 +1058,6 @@ class Oblige(object):
                            user = self.db_destination['user'],
                            passwd = self.db_destination['pass'],
                            db = self.db_destination['db'])
-        #conn.autocommit(True)
         cursor = conn.cursor()
         # these have to be in this order or the key constriants fail
         self.insert_networks(cursor, conn)
