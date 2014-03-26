@@ -11,8 +11,16 @@
 DROP TABLE IF EXISTS `dnsnameservers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `dnsnameservers` ( `address` varchar(128) NOT NULL,`subnet_id` varchar(36) NOT NULL, PRIMARY KEY (`address`,`subnet_id`), KEY `subnet_id` (`subnet_id`), CONSTRAINT `dnsnameservers_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+CREATE TABLE `dnsnameservers` (
+    `address` varchar(128) NOT NULL,
+    `subnet_id` varchar(36) NOT NULL, 
+    PRIMARY KEY (`address`,`subnet_id`), 
+    KEY `subnet_id` (`subnet_id`), 
+    CONSTRAINT `dnsnameservers_ibfk_1` 
+    FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
 DROP TABLE IF EXISTS `ipallocationpools`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -24,7 +32,7 @@ CREATE TABLE `ipallocationpools` (
   PRIMARY KEY (`id`),
   KEY `subnet_id` (`subnet_id`),
   CONSTRAINT `ipallocationpools_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,7 +54,7 @@ CREATE TABLE `ipallocations` (
   CONSTRAINT `ipallocations_ibfk_1` FOREIGN KEY (`port_id`) REFERENCES `ports` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ipallocations_ibfk_2` FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ipallocations_ibfk_3` FOREIGN KEY (`network_id`) REFERENCES `networks` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -62,7 +70,7 @@ CREATE TABLE `ipavailabilityranges` (
   `last_ip` varchar(64) NOT NULL,
   PRIMARY KEY (`allocation_pool_id`,`first_ip`,`last_ip`),
   CONSTRAINT `ipavailabilityranges_ibfk_1` FOREIGN KEY (`allocation_pool_id`) REFERENCES `ipallocationpools` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -80,7 +88,7 @@ CREATE TABLE `networks` (
   `admin_state_up` tinyint(1) DEFAULT NULL,
   `shared` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -103,7 +111,7 @@ CREATE TABLE `ports` (
   PRIMARY KEY (`id`),
   KEY `network_id` (`network_id`),
   CONSTRAINT `ports_ibfk_1` FOREIGN KEY (`network_id`) REFERENCES `networks` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -125,7 +133,7 @@ CREATE TABLE `quark_dns_nameservers` (
   KEY `tag_association_uuid` (`tag_association_uuid`),
   CONSTRAINT `quark_dns_nameservers_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `quark_subnets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `quark_dns_nameservers_ibfk_2` FOREIGN KEY (`tag_association_uuid`) REFERENCES `quark_tag_associations` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -155,7 +163,7 @@ CREATE TABLE `quark_ip_addresses` (
   KEY `ix_quark_ip_addresses_deallocated_at` (`deallocated_at`),
   CONSTRAINT `quark_ip_addresses_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `quark_subnets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `quark_ip_addresses_ibfk_2` FOREIGN KEY (`network_id`) REFERENCES `quark_networks` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -172,7 +180,7 @@ CREATE TABLE `quark_ip_policy` (
   `name` varchar(255) DEFAULT NULL,
   `description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -190,7 +198,7 @@ CREATE TABLE `quark_ip_policy_cidrs` (
   PRIMARY KEY (`id`),
   KEY `ip_policy_id` (`ip_policy_id`),
   CONSTRAINT `quark_ip_policy_cidrs_ibfk_1` FOREIGN KEY (`ip_policy_id`) REFERENCES `quark_ip_policy` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -208,7 +216,7 @@ CREATE TABLE `quark_mac_address_ranges` (
   `last_address` bigint(20) NOT NULL,
   `next_auto_assign_mac` bigint(20) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -229,7 +237,7 @@ CREATE TABLE `quark_mac_addresses` (
   KEY `mac_address_range_id` (`mac_address_range_id`),
   KEY `ix_quark_mac_addresses_deallocated_at` (`deallocated_at`),
   CONSTRAINT `quark_mac_addresses_ibfk_1` FOREIGN KEY (`mac_address_range_id`) REFERENCES `quark_mac_address_ranges` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=187723572703011 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=187723572703011 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -251,7 +259,7 @@ CREATE TABLE `quark_networks` (
   KEY `ip_policy_id` (`ip_policy_id`),
   KEY `ix_quark_networks_tenant_id` (`tenant_id`),
   CONSTRAINT `quark_networks_ibfk_1` FOREIGN KEY (`ip_policy_id`) REFERENCES `quark_ip_policy` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -274,7 +282,7 @@ CREATE TABLE `quark_nvp_driver_lswitch` (
   PRIMARY KEY (`id`),
   KEY `ix_quark_nvp_driver_lswitch_nvp_id` (`nvp_id`),
   KEY `ix_quark_nvp_driver_lswitch_network_id` (`network_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -293,7 +301,7 @@ CREATE TABLE `quark_nvp_driver_lswitchport` (
   KEY `switch_id` (`switch_id`),
   KEY `ix_quark_nvp_driver_lswitchport_port_id` (`port_id`),
   CONSTRAINT `quark_nvp_driver_lswitchport_ibfk_1` FOREIGN KEY (`switch_id`) REFERENCES `quark_nvp_driver_lswitch` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -310,7 +318,7 @@ CREATE TABLE `quark_nvp_driver_qos` (
   `max_bandwidth_rate` int(11) NOT NULL,
   `min_bandwidth_rate` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -326,7 +334,7 @@ CREATE TABLE `quark_nvp_driver_security_profile` (
   `nvp_id` varchar(36) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_quark_nvp_driver_security_profile_nvp_id` (`nvp_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -343,7 +351,7 @@ CREATE TABLE `quark_port_ip_address_associations` (
   KEY `ip_address_id` (`ip_address_id`),
   CONSTRAINT `quark_port_ip_address_associations_ibfk_1` FOREIGN KEY (`port_id`) REFERENCES `quark_ports` (`id`),
   CONSTRAINT `quark_port_ip_address_associations_ibfk_2` FOREIGN KEY (`ip_address_id`) REFERENCES `quark_ip_addresses` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -360,7 +368,7 @@ CREATE TABLE `quark_port_security_group_associations` (
   KEY `group_id` (`group_id`),
   CONSTRAINT `quark_port_security_group_associations_ibfk_1` FOREIGN KEY (`port_id`) REFERENCES `quark_ports` (`id`),
   CONSTRAINT `quark_port_security_group_associations_ibfk_2` FOREIGN KEY (`group_id`) REFERENCES `quark_security_groups` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -390,7 +398,7 @@ CREATE TABLE `quark_ports` (
   KEY `idx_ports_1` (`device_id`,`tenant_id`),
   KEY `idx_ports_2` (`device_owner`,`network_id`),
   CONSTRAINT `quark_ports_ibfk_1` FOREIGN KEY (`network_id`) REFERENCES `quark_networks` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -413,7 +421,7 @@ CREATE TABLE `quark_routes` (
   KEY `tag_association_uuid` (`tag_association_uuid`),
   CONSTRAINT `quark_routes_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `quark_subnets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `quark_routes_ibfk_2` FOREIGN KEY (`tag_association_uuid`) REFERENCES `quark_tag_associations` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -438,7 +446,7 @@ CREATE TABLE `quark_security_group_rule` (
   PRIMARY KEY (`id`),
   KEY `group_id` (`group_id`),
   CONSTRAINT `quark_security_group_rule_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `quark_security_groups` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -456,7 +464,7 @@ CREATE TABLE `quark_security_groups` (
   `tenant_id` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_quark_security_groups_tenant_id` (`tenant_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -491,7 +499,7 @@ CREATE TABLE `quark_subnets` (
   CONSTRAINT `quark_subnets_ibfk_1` FOREIGN KEY (`network_id`) REFERENCES `quark_networks` (`id`),
   CONSTRAINT `quark_subnets_ibfk_2` FOREIGN KEY (`ip_policy_id`) REFERENCES `quark_ip_policy` (`id`),
   CONSTRAINT `quark_subnets_ibfk_3` FOREIGN KEY (`tag_association_uuid`) REFERENCES `quark_tag_associations` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -506,7 +514,7 @@ CREATE TABLE `quark_tag_associations` (
   `created_at` datetime DEFAULT NULL,
   `discriminator` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -525,7 +533,7 @@ CREATE TABLE `quark_tags` (
   PRIMARY KEY (`id`),
   KEY `association_uuid` (`association_uuid`),
   CONSTRAINT `quark_tags_ibfk_1` FOREIGN KEY (`association_uuid`) REFERENCES `quark_tag_associations` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -542,7 +550,7 @@ CREATE TABLE `quotas` (
   `limit` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_quotas_tenant_id` (`tenant_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -559,7 +567,7 @@ CREATE TABLE `subnetroutes` (
   PRIMARY KEY (`destination`,`nexthop`,`subnet_id`),
   KEY `subnet_id` (`subnet_id`),
   CONSTRAINT `subnetroutes_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -582,7 +590,7 @@ CREATE TABLE `subnets` (
   PRIMARY KEY (`id`),
   KEY `network_id` (`network_id`),
   CONSTRAINT `subnets_ibfk_1` FOREIGN KEY (`network_id`) REFERENCES `networks` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
