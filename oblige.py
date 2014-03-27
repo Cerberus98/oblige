@@ -257,8 +257,11 @@ class Oblige(object):
                 LOG.critical("Cell regex matched {}".format(networks[net_id]["tenant_id"]))
                 if net["name"] == 'public': 
                     self.pubpriv[net_id] = pub_rax.id
+                    q_network = pub_rax
                 else:
                     self.pubpriv[net_id] = prv_rax.id
+                    q_network = prv_rax
+                self.quark_networks[net_id] = q_network
             else:
                 cache_net = networks[net_id]
                 q_network = quark.QuarkNetwork(id=net_id,
@@ -268,7 +271,7 @@ class Oblige(object):
                     network_plugin=cache_net["network_plugin"],
                     ipam_strategy="ANY")
                 self.quark_networks[q_network.id] = q_network
-                m += 1
+            m += 1
         
         for block_id, block in self.ip_blocks.iteritems():
             isdone = False
@@ -358,8 +361,8 @@ class Oblige(object):
             if block.policy_id:
                 if block.policy_id not in self.policy_ids.keys():
                     self.policy_ids[block.policy_id] = {}
-                if block.network_id in self.pubpriv.keys():
-                    self.policy_ids[block.policy_id][self.pubpriv[block.network_id]] = _br(self.pubpriv[block.network_id])
+                #if block.network_id in self.pubpriv.keys():
+                    #self.policy_ids[block.policy_id][self.pubpriv[block.network_id]] = _br(self.pubpriv[block.network_id])
                 else:
                     self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
             else:
@@ -613,7 +616,7 @@ class Oblige(object):
                 self.quark_ip_policies.update({policy_uuid: q_ip_policy})
                 for rule in policy_rules:
                     if block_id in self.pubpriv.keys():
-                        outer_cidr = self.
+                        outer_cidr = self.ip_blocks[block_id].cidr
                     else:
                         outer_cidr = self.ip_blocks[block_id].cidr
                     _cidr = make_cidr(outer_cidr, rule[0], rule[1])
@@ -643,7 +646,11 @@ class Oblige(object):
             `ipam_strategy`,
             `network_plugin`) 
         VALUES """
+        ids = set([record.id for record in self.quark_networks.values()])
         for record in self.quark_networks.values():
+            if record.id not in ids:
+                continue
+            ids.remove(record.id)
             m += 1
             #record = mysqlize(record)
             record.tenant_id = escape(record.tenant_id)
