@@ -97,6 +97,9 @@ def get_config():
         return None
     return config
 
+def escape(astr):
+    return astr.replace("'", "\\'")
+
 def mysqlize(some_object):
     members = [attr for attr in dir(some_object)
             if not callable(attr) and not attr.startswith("__")]

@@ -110,7 +110,7 @@ class QuarkTagAssociation(object):
 class QuarkSubnet(object):
     def __init__(self, id, tenant_id, created_at, network_id, _cidr, first_ip,
             last_ip, ip_version, next_auto_assign_ip, tag_association_uuid,
-            do_not_use, name, ip_policy_id):
+            do_not_use, name, ip_policy_id, segment_id=False):
         self.id = id
         self.name = name
         self.tenant_id = tenant_id
@@ -125,7 +125,7 @@ class QuarkSubnet(object):
         self.tag_association_uuid = tag_association_uuid
         self.do_not_use = do_not_use
         self.enable_dhcp = False  # TODO
-        self.segment_id = tenant_id
+        self.segment_id = segment_id #tenant_id
 
     def __str__(self):
         return stringer(self)

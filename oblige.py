@@ -20,10 +20,11 @@ from utils import get_config
 from utils import paginate_query
 from utils import create_schema
 from utils import handle_null
+from utils import escape
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(format='%(funcName)s: %(lineno)s - %(message)s',
-        filename='oblige_debug.log', level=logging.DEBUG)
+        filename='debug.log', level=logging.DEBUG)
 
 # TODO: paginate query all the inserts
 # TODO: remove the mysqlize calls
@@ -212,7 +213,7 @@ class Oblige(object):
         self.interface_ip = {}
         self.port_cache = {}
         self.interface_tenant = {}
-
+        self.pubpriv = {}
         print("\tInitialization complete in {:.2f} seconds.".format(
             time.time() - self.start_time))
         
@@ -221,6 +222,7 @@ class Oblige(object):
         print("Migrating networks...")
         networks = {}
         cell_regex = re.compile("\w{3}-\w{1}\d{4}")
+        preprod_cell_regex = re.compile("\w{7}-\w{3}-\w{1}\d{4}")
         m = 0
         prv_rax = quark.QuarkNetwork(id='11111111-1111-1111-1111-111111111111',
                                      tenant_id='rackspace',
@@ -251,15 +253,22 @@ class Oblige(object):
                 if networks[_br(block.network_id)]["created_at"] > block.created_at:
                     networks[_br(block.network_id)]["created_at"] = block.created_at
         for net_id, net in networks.iteritems():
-            cache_net = networks[net_id]
-            q_network = quark.QuarkNetwork(id=net_id,
+            if cell_regex.match(networks[net_id]["tenant_id"]) or preprod_cell_regex.match(networks[net_id]["tenant_id"]):
+                LOG.critical("Cell regex matched {}".format(networks[net_id]["tenant_id"]))
+                if net["name"] == 'public': 
+                    self.pubpriv[net_id] = pub_rax.id
+                else:
+                    self.pubpriv[net_id] = prv_rax.id
+            else:
+                cache_net = networks[net_id]
+                q_network = quark.QuarkNetwork(id=net_id,
                     tenant_id=cache_net["tenant_id"],
                     name=cache_net["name"],
                     created_at=networks[_br(net_id)]["created_at"],
                     network_plugin=cache_net["network_plugin"],
                     ipam_strategy="ANY")
-            self.quark_networks[q_network.id] = q_network
-            m += 1
+                self.quark_networks[q_network.id] = q_network
+                m += 1
         
         for block_id, block in self.ip_blocks.iteritems():
             isdone = False
@@ -278,7 +287,7 @@ class Oblige(object):
                             limit=block.max_allocation,
                             tenant_id=block.tenant_id)})
             
-            if cell_regex.match(block.tenant_id):
+            if cell_regex.match(block.tenant_id) or preprod_cell_regex.match(block.tenant_id):
                 if block.network_name and 'private' in block.network_name:
                     self.quark_subnets.update({block.id: quark.QuarkSubnet(
                             id=block.id,
@@ -293,7 +302,8 @@ class Oblige(object):
                             ip_policy_id=block.policy_id,
                             next_auto_assign_ip=block.allocatable_ip_counter,
                             tag_association_uuid=None,
-                            do_not_use=0)})
+                            do_not_use=0,
+                            segment_id=block.tenant_id)})
                     isdone = True
                 elif block.network_name and 'public' in block.network_name:
                     self.quark_subnets.update({block.id: quark.QuarkSubnet(
@@ -309,7 +319,8 @@ class Oblige(object):
                             ip_policy_id=block.policy_id,
                             next_auto_assign_ip=block.allocatable_ip_counter,
                             tag_association_uuid=None,
-                            do_not_use=0)})
+                            do_not_use=0,
+                            segment_id=block.tenant_id)})
                     isdone = True
                 if not isdone:
                     LOG.critical("rackspace tenant name {} not in ['public','private'] for ip_block {}".
@@ -347,7 +358,10 @@ class Oblige(object):
             if block.policy_id:
                 if block.policy_id not in self.policy_ids.keys():
                     self.policy_ids[block.policy_id] = {}
-                self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
+                if block.network_id in self.pubpriv.keys():
+                    self.policy_ids[block.policy_id][self.pubpriv[block.network_id]] = _br(self.pubpriv[block.network_id])
+                else:
+                    self.policy_ids[block.policy_id][block.id] = _br(block.network_id)
             else:
                 LOG.critical("Block lacks policy (this is bad): {}".format(block.id))
         # add routes:
@@ -438,6 +452,7 @@ class Oblige(object):
         m = 0
         n = 0
         cell_regex = re.compile("\w{3}-\w{1}\d{4}")
+        preprod_cell_regex = re.compile("\w{7}-\w{3}-\w{1}\d{4}")
         for interface_id, interface in self.interfaces.iteritems():
             if interface_id not in self.interface_network:
                 LOG.critical("No network for {}".format(interface_id))
@@ -445,10 +460,13 @@ class Oblige(object):
                 continue
             m += 1
             network_id = self.interface_network[interface_id]
-            the_block = self.quark_networks[network_id]
+            if network_id in self.pubpriv.keys():
+                the_block = self.quark_networks[self.pubpriv[network_id]]
+            else:
+                the_block = self.quark_networks[network_id]
             debug = False
             bridge_name = None
-            if cell_regex.match(the_block.tenant_id):
+            if cell_regex.match(the_block.tenant_id) or preprod_cell_regex.match(the_block.tenant_id):
                 # this is a rackspace interface
                 if the_block.name == "public":
                     bridge_name = "publicnet"
@@ -579,7 +597,10 @@ class Oblige(object):
                 policy_description = None
             for block_id in policy_block_ids.keys():
                 policy_uuid = policy
-                q_network = self.quark_networks[policy_block_ids[block_id]]
+                if block_id in self.pubpriv.keys():
+                    q_network = self.quark_networks[self.pubpriv[block_id]]
+                else:
+                    q_network = self.quark_networks[policy_block_ids[block_id]]
                 the_name = self.policies[policy].name
                 if not policy_description:
                     the_desc = the_name
@@ -591,7 +612,10 @@ class Oblige(object):
                         name=the_name)
                 self.quark_ip_policies.update({policy_uuid: q_ip_policy})
                 for rule in policy_rules:
-                    outer_cidr = self.ip_blocks[block_id].cidr
+                    if block_id in self.pubpriv.keys():
+                        outer_cidr = self.
+                    else:
+                        outer_cidr = self.ip_blocks[block_id].cidr
                     _cidr = make_cidr(outer_cidr, rule[0], rule[1])
                     if _cidr:
                         q_ip_policy_cidr = quark.QuarkIpPolicyRule(
@@ -621,8 +645,9 @@ class Oblige(object):
         VALUES """
         for record in self.quark_networks.values():
             m += 1
-            record = mysqlize(record)
-            query += "({0},{1},{2},{3},{4},{5}),\n".format(record.id,
+            #record = mysqlize(record)
+            record.tenant_id = escape(record.tenant_id)
+            query += "('{0}','{1}','{2}','{3}','{4}','{5}'),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
