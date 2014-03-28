@@ -63,11 +63,11 @@ def create_schema(dest):
     #quarkmodels.BASEV2.metadata.drop_all(engine)
     #quarkmodels.BASEV2.metadata.create_all(engine)
 
-def paginate_query(all_records):
+def paginate_query(all_records, size=20000000):
     """return a list of strings less than max_byte_size each for mysql consumption"""
-    avg = sum([len(all_records[i]) for i in range(100)])/100
+    avg = sum([len(all_records[i]) for i in xrange(100)])/100
     total_byte_size = avg * len(all_records) #sys.getsizeof(all_records)
-    max_byte_size = 20000000
+    max_byte_size = size
     records = len(all_records)
     avg_record_bytes = total_byte_size / records
     records_per_chunk = int(math.ceil(max_byte_size / avg_record_bytes))
@@ -105,16 +105,16 @@ def mysqlize(some_object):
             if not callable(attr) and not attr.startswith("__")]
     for m in members:
         x = getattr(some_object, m)
-        if type(x) is str:
+        if isinstance(x, str):
             x = x.replace("'", "\\'")
-        elif type(x) is int:
+        elif isinstance(x, int):
             # doesn't need quotes
             continue
-        elif type(x) is datetime.datetime:
+        elif isinstance(x, datetime.datetime):
             x = x.strftime('%Y-%m-%d %H:%M:%S')
-        elif type(x) is bool:
+        elif isinstance(x, bool):
             x = 1 if x else 0
-        elif type(x) is set:
+        elif isinstance(x, set):
             continue
         setattr(some_object, m, "'{}'".format(x) if x else 'NULL')
     return some_object
@@ -228,8 +228,8 @@ def list_to_ranges(the_list=None):
 def consolidate_ranges(the_ranges):
     if not the_ranges:
         return []
-    if the_ranges[0] == 255:
-        the_ranges[0] = -1
+    #if the_ranges[0] == 255:
+    #    the_ranges[0] = -1
     if len(the_ranges) < 2:
         return the_ranges
     the_ranges = sorted(the_ranges, key=lambda ran: ran[0])
