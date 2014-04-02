@@ -26,7 +26,7 @@ from utils import dater
 from utils import nuller
 
 LOG = logging.getLogger(__name__)
-logging.basicConfig(format='%(funcName)s: %(lineno)s - %(level)s - %(message)s',
+logging.basicConfig(format='%(funcName)s: %(lineno)s - %(levelname)s - %(message)s',
         filename='debug.log', filemode='w', level=logging.DEBUG)
 
 NULL = ["NULL", "Null", "null", None, False, 0]
@@ -624,7 +624,9 @@ class Oblige(object):
                                                    record.ipam_strategy,
                                                    record.network_plugin)
         query = query.rstrip(',\n')
-        LOG.info(query)
+        with open('query/insert_networks.sql', 'w') as f:
+            f.write(query)
+        #LOG.info(query)
         cursor.execute(query)
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
@@ -666,12 +668,14 @@ class Oblige(object):
                     record.device_owner, # varchar nullable
                     record.bridge)) # varchar nullable
         chunks = paginate_query(all_records)
-        for i, chunk in enumerate(chunks):
-            chunk_query = query + chunk
-            chunk_query = chunk_query.rstrip(',\n')
-            LOG.info(chunk_query)
-            cursor.execute(chunk_query)
-            connection.commit()
+        with open('query/insert_ports.sql', 'w') as f:
+            for i, chunk in enumerate(chunks):
+                chunk_query = query + chunk
+                chunk_query = chunk_query.rstrip(',\n')
+                f.write(chunk_query)
+                #LOG.info(chunk_query)
+                cursor.execute(chunk_query)
+                connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m)) 
    
@@ -704,7 +708,10 @@ class Oblige(object):
                     record.ip_policy_id,
                     record.enable_dhcp,
                     record.segment_id)
-        LOG.info(query)
+        
+        with open('query/insert_subnets.sql', 'w') as f:
+            f.write(query)
+        #LOG.info(query)
         cursor.execute(query.rstrip(',\n'))
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
@@ -736,12 +743,15 @@ class Oblige(object):
                     record.deallocated_at,
                     record.allocated_at))
         chunks = paginate_query(all_records)
-        for i, chunk in enumerate(chunks):
-            chunk_query = query + chunk
-            chunk_query = chunk_query.rstrip(',\n')
-            LOG.info(chunk_query)
-            cursor.execute(chunk_query)
-            connection.commit()
+    
+        with open('query/insert_ip_addresses.sql', 'w') as f:
+            for i, chunk in enumerate(chunks):
+                chunk_query = query + chunk
+                chunk_query = chunk_query.rstrip(',\n')
+                f.write(chunk_query)
+                #LOG.info(chunk_query)
+                cursor.execute(chunk_query)
+                connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(
             time.time() - self.start_time, m))
 
@@ -758,12 +768,14 @@ class Oblige(object):
                 m += 1
                 all_records.append("('{0}',{1}),\n".format(port_id, ip.id))
         chunks = paginate_query(all_records)
-        for i, chunk in enumerate(chunks):
-            chunk_query = query_head + chunk
-            chunk_query = chunk_query.rstrip(',\n')
-            LOG.info(chunk_query)
-            cursor.execute(chunk_query)
-            connection.commit()
+        with open('query/insert_port_ip_assn.sql', 'w') as f:
+            for i, chunk in enumerate(chunks):
+                chunk_query = query_head + chunk
+                chunk_query = chunk_query.rstrip(',\n')
+                f.write(chunk_query)
+                #LOG.info(chunk_query)
+                cursor.execute(chunk_query)
+                connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
     
 
@@ -783,7 +795,10 @@ class Oblige(object):
                     record.tenant_id,
                     record.description,
                     record.created_at)
-        LOG.info(query)
+        #LOG.info(query)
+    
+        with open('query/insert_ip_policies.sql', 'w') as f:
+            f.write(query.rstrip(',\n'))
         cursor.execute(query.rstrip(',\n'))
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
@@ -822,15 +837,14 @@ class Oblige(object):
                             port.port_id, switch.id, port.created_at)
         query = query.rstrip(',\n')
         port_query = port_query.rstrip(',\n')
-        try:
-            LOG.info(query)
-            cursor.execute(query)
-            connection.commit()
-            LOG.info(port_query)
-            cursor.execute(port_query)
-            connection.commit()
-        except Exception as e:
-            print("\tError inserting nvp ports: {}".format(e))
+        with open('query/insert_nvp_driver_lswitch.sql', 'w') as f:
+            f.write(query)
+        with open('query/insert_nvp_driver_lswitchport.sql', 'w') as f:
+            f.write(port_query)
+        cursor.execute(query)
+        connection.commit()
+        cursor.execute(port_query)
+        connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
    
 
@@ -846,16 +860,19 @@ class Oblige(object):
             try:
                 mac_range = self.mac_address_ranges[mac_range_id]
                 # There is only one mac range so this is fine:
-                cursor.execute(""" INSERT
-                INTO quark_mac_address_ranges ( `id`, `created_at`, `cidr`, 
-                    `first_address`, `last_address`, `next_auto_assign_mac`)
-                VALUES ('{0}','{1}','{2}',{3},{4},{5})""".format(
-                    mac_range.id,
-                    mac_range.created_at,
-                    mac_range.cidr,
-                    mac_range.first_address,
-                    mac_range.last_address,
-                    mac_range.next_auto_assign_mac))
+                _query = """ INSERT
+                         INTO quark_mac_address_ranges ( `id`, `created_at`, `cidr`,
+                              `first_address`, `last_address`, `next_auto_assign_mac`)
+                          VALUES ('{0}','{1}','{2}',{3},{4},{5})""".format(
+                               mac_range.id,
+                               mac_range.created_at,
+                               mac_range.cidr,
+                               mac_range.first_address,
+                               mac_range.last_address,
+                               mac_range.next_auto_assign_mac)
+                with open('query/insert_mac_address_ranges.sql', 'w') as f:
+                    f.write(_query)
+                cursor.execute(_query)
                 connection.commit()
             except MySQLdb.Error, e:
                 try:
@@ -873,12 +890,14 @@ class Oblige(object):
                         mac.deallocated,
                         mac.deallocated_at))
         chunks = paginate_query(all_records)
-        for i, chunk in enumerate(chunks):
-            chunk_query = query + chunk
-            chunk_query = chunk_query.rstrip(',\n')
-            LOG.info(chunk_query)
-            cursor.execute(chunk_query)
-            connection.commit()
+        with open('query/insert_mac_addresses.sql', 'w') as f:
+            for i, chunk in enumerate(chunks):
+                chunk_query = query + chunk
+                chunk_query = chunk_query.rstrip(',\n')
+                f.write(chunk_query)
+                #LOG.info(chunk_query)
+                cursor.execute(chunk_query)
+                connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time, m))
 
 
@@ -899,7 +918,10 @@ class Oblige(object):
                     record.subnet_id,
                     record.tag_association_uuid)
         query = query.rstrip(',\n')
-        LOG.info(query)
+        #LOG.info(query)
+
+        with open('query/insert_routes.sql', 'w') as f:
+            f.write(query)
         cursor.execute(query)
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
@@ -922,7 +944,9 @@ class Oblige(object):
                     record.subnet_id,
                     record.tag_association_uuid)
         query = query.rstrip(',\n')
-        LOG.info(query)
+        #LOG.info(query)
+        with open('query/insert_dns_nameservers.sql', 'w') as f:
+            f.write(query)
         cursor.execute(query)
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
@@ -930,7 +954,7 @@ class Oblige(object):
 
 
     def insert_ip_policy_rules(self, cursor, connection):
-        print("Inserting ip policy rules...")
+        print("Inserting ip policy cidrs...")
         query = """ INSERT
         INTO quark_ip_policy_cidrs ( `id`, `ip_policy_id`, `created_at`, `cidr`)
         VALUES """
@@ -943,7 +967,9 @@ class Oblige(object):
                         record.created_at,
                         record.cidr)
         query = query.rstrip(',\n')
-        LOG.info(query)
+        #LOG.info(query)
+        with open('query/insert_ip_policy_cidrs.sql', 'w') as f:
+            f.write(query)
         cursor.execute(query)
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
@@ -963,7 +989,9 @@ class Oblige(object):
                     record.limit,
                     record.resource)
         query = query.rstrip(',\n')
-        LOG.info(query)
+        #LOG.info(query)
+        with open('query/insert_quotas.sql', 'w') as f:
+            f.write(query)
         cursor.execute(query)
         connection.commit()
         print("\tDone, {:.2f} sec, {} migrated.".format(time.time() - self.start_time,
