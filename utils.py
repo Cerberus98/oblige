@@ -98,7 +98,19 @@ def get_config():
     return config
 
 def escape(astr):
-    return astr.replace("'", "\\'")
+    if not astr:
+        return 'NULL'
+    return "'{}'".format(astr.replace("'", "\\'"))
+
+def dater(date):
+    if not date:
+        return 'NULL'
+    return "'{}'".format(date.strftime('%Y-%m-%d %H:%M:%S'))
+
+def nuller(boo):
+    if not boo or boo == 0:
+        return False
+    return True
 
 def mysqlize(some_object):
     members = [attr for attr in dir(some_object)
@@ -186,20 +198,18 @@ def make_offset_lengths(octets, offsets):
     return ranges_to_offset_lengths(tmp_all)
 
 def make_cidr(outer_cidr, offset, length):
-    #if offset < 0 and length + offset == 4:
-        #print("Noob")
+    LOG.debug("make_cidr({}, {}, {})".format(outer_cidr, offset, length))
+    if int(offset) < 0:
+        t = netaddr.IPNetwork(outer_cidr)
+        my_set = netaddr.IPSet(netaddr.IPRange(t[offset], t[-1]))
+        net = my_set.pop()
+        LOG.critical("Rackconnect ### {}".format(str(net)))
+        return str(net)
     network = netaddr.IPNetwork(outer_cidr)
     first_ip = netaddr.IPAddress(int(network.first) + offset)
     last_ip = netaddr.IPAddress(int(first_ip) + (length - 1))
     cidr = netaddr.iprange_to_cidrs(first_ip, last_ip)
-    #if len(cidr) > 1:
-        #print("Network: {}".format(network))
-        #print("Offset:  {}".format(offset))
-        #print("Length:  {}".format(length))
-        #print cidr
-    # TODO: confirm that offset/lengths like -8192/8196 desire default policies
-    #    return None
-        #raise Exception
+    LOG.debug("Not Rackconnect --- {}".format(str(cidr[0])))
     return str(cidr[0])
 
 def offset_to_range(offset):

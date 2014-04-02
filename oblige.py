@@ -22,14 +22,12 @@ from utils import create_schema
 from utils import handle_null
 from utils import escape
 from utils import stringer
+from utils import dater
+from utils import nuller
 
 LOG = logging.getLogger(__name__)
-logging.basicConfig(format='%(funcName)s: %(lineno)s - %(message)s',
+logging.basicConfig(format='%(funcName)s: %(lineno)s - %(level)s - %(message)s',
         filename='debug.log', filemode='w', level=logging.DEBUG)
-
-# TODO: paginate query all the inserts
-# TODO: remove the mysqlize calls
-# TODO: run times on all the DBs
 
 NULL = ["NULL", "Null", "null", None, False, 0]
 
@@ -446,10 +444,10 @@ class Oblige(object):
             self.interface_tenant[interface_id] = interface.tenant_id
             port_id = interface.vif_id_on_device
             if not port_id:
-                LOG.critical("interface.vif_id_on_device is NULL, "
-                             "tenant_id: {0} interface_id: {1}".format(
-                                 interface.tenant_id,
-                                 interface_id))
+                #LOG.critical("interface.vif_id_on_device is NULL, "
+                #             "tenant_id: {0} interface_id: {1}".format(
+                #                 interface.tenant_id,
+                #                 interface_id))
                 port_id = "TODO" 
             q_port = quark.QuarkPort(
                     id=interface_id,
@@ -618,7 +616,8 @@ class Oblige(object):
             m += 1
             #record = mysqlize(record)
             record.tenant_id = escape(record.tenant_id)
-            query += "('{0}','{1}','{2}','{3}','{4}','{5}'),\n".format(record.id,
+            record.name = escape(record.name)
+            query += "('{0}',{1},'{2}',{3},'{4}','{5}'),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
@@ -642,22 +641,30 @@ class Oblige(object):
         VALUES """
         all_records = []
         for record in self.port_cache.values():
-            record = mysqlize(record)
+            #record = mysqlize(record)
+            record.name = escape(record.name)
+            record.created_at = dater(record.created_at)
+            record.device_id = escape(record.device_id)
+            record.tenant_id = escape(record.tenant_id)
+            record.device_owner = nuller(record.device_id)
+            record.bridge = escape(record.bridge)
+
             if record.device_id == 'NULL':
                 LOG.critical("NULL device_id in {}".format(stringer(record)))
+                record.device_id = "'NULL'"
             m += 1
-            all_records.append("({0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}),\n".format(
-                    record.id,
-                    record.tenant_id,
-                    record.created_at,
-                    record.name,
-                    record.admin_state_up,
-                    record.network_id,
-                    record.backend_key,
-                    record.mac_address,
-                    record.device_id,
-                    record.device_owner,
-                    record.bridge))
+            all_records.append("('{0}',{1},{2},{3},{4},'{5}','{6}',{7},{8},{9},{10}),\n".format(
+                    record.id, # varchar NOT null
+                    record.tenant_id, #varchar nullable
+                    record.created_at, # datetime nullable
+                    record.name, # varchar nullable
+                    record.admin_state_up, # tinyint nullable
+                    record.network_id, # varchar NOT null
+                    record.backend_key, # varchar NOT null
+                    record.mac_address, # bigint nullable
+                    record.device_id, # varchar NOT null
+                    record.device_owner, # varchar nullable
+                    record.bridge)) # varchar nullable
         chunks = paginate_query(all_records)
         for i, chunk in enumerate(chunks):
             chunk_query = query + chunk
