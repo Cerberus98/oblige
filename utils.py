@@ -9,8 +9,14 @@ import MySQLdb
 LOG = logging.getLogger(__name__)
 
 def stringer(obj):
-    maxwidth = 27
+    maxwidth = 35
     retstr = "\n"
+    if isinstance(obj, dict):
+        i = 0
+        for k, v in obj.iteritems():
+            if i < 5:
+                retstr += "{0}: {1}\n".format(k.rjust(maxwidth), v)
+        return retstr
     members = [attr for attr in dir(obj)
             if not callable(attr) and not attr.startswith("__")]
     if members:
@@ -50,8 +56,9 @@ def create_schema(dest):
     schema = open("neutron_schema.sql").read()
     cursor.execute(schema)
     more = True
+    x = None
     while more:
-        print cursor.fetchall()
+        x = cursor.fetchall()
         more = cursor.nextset()
     conn.commit()
     conn.set_server_option(MYSQL_OPTION_MULTI_STATEMENTS_OFF)
