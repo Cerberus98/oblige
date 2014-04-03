@@ -810,7 +810,7 @@ class Oblige(object):
             #record = mysqlize(record)
             record.tenant_id = escape(record.tenant_id)
             record.name = escape(record.name)
-            query += "('{0}',{1},'{2}',{3},'{4}','{5}'),\n".format(record.id,
+            query += "('{0}','{1}','{2}','{3}','{4}','{5}'),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
