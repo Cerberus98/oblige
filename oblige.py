@@ -158,7 +158,7 @@ class Oblige(object):
         self.quark_networks = {}
         self.quark_tag_associations = {}
         self.quark_subnets = {}
-        self.quark_dns_nameservers = {}
+        self.quark_dns_nameservers = []
         self.quark_routes = {}
         self.quark_ip_policies = {}
         self.quark_ip_policy_cidrs = {}
@@ -355,25 +355,23 @@ class Oblige(object):
                 LOG.info("self.quark_subnets[{}] = {}".format(block.id,
                             stringer(self.quark_subnets[block.id])))
             if block.dns1:
-                self.quark_dns_nameservers.update({block.id: quark.QuarkDnsNameserver(
+                self.quark_dns_nameservers.append(quark.QuarkDnsNameserver(
                     id=str(uuid4()),
                     ip=int(netaddr.IPAddress(block.dns1)),
                     created_at=block.created_at,
                     tenant_id=block.tenant_id,
-                    subnet_id=block.id)})
-                LOG.info("self.quark_dns_nameservers[{}] = {}".format(block.id,
-                    stringer(self.quark_dns_nameservers[block.id])))
+                    subnet_id=block.id))
+                LOG.info("self.quark_dns_nameservers.append({})".format(
+                    self.quark_dns_nameservers[-1]))
             if block.dns2:
-                # TODO XXX : overwriting the block.id nameserver here arent we
-
-                self.quark_dns_nameservers.update({block.id: quark.QuarkDnsNameserver(
+                self.quark_dns_nameservers.append(quark.QuarkDnsNameserver(
                     id=str(uuid4()),
                     ip=int(netaddr.IPAddress(block.dns2)),
                     created_at=block.created_at,
                     tenant_id=block.tenant_id,
-                    subnet_id=block.id)})
-                LOG.info("self.quark_dns_nameservers[{}] = {}".format(block.id,
-                    stringer(self.quark_dns_nameservers[block.id])))
+                    subnet_id=block.id))
+                LOG.info("self.quark_dns_nameservers.append({})".format(
+                    self.quark_dns_nameservers[-1]))
             LOG.info("Calling self.migrate_routes({})".format(block))
             self.migrate_routes(block)
             LOG.info("Done with migrate_routes({})".format(block))
@@ -810,7 +808,7 @@ class Oblige(object):
             #record = mysqlize(record)
             record.tenant_id = escape(record.tenant_id)
             record.name = escape(record.name)
-            query += "('{0}','{1}','{2}','{3}','{4}','{5}'),\n".format(record.id,
+            query += "('{0}',{1},'{2}',{3},'{4}','{5}'),\n".format(record.id,
                                                    record.tenant_id,
                                                    record.created_at,
                                                    record.name,
@@ -1127,7 +1125,7 @@ class Oblige(object):
         INTO quark_dns_nameservers ( `id`, `tenant_id`, `created_at`,
             `ip`, `subnet_id`, `tag_association_uuid`)
         VALUES """
-        for ns_id, ns in self.quark_dns_nameservers.iteritems():
+        for ns in self.quark_dns_nameservers:
             record = mysqlize(ns)
             query += "({0},{1},{2},{3},{4},{5}),\n".format(
                     record.id,
