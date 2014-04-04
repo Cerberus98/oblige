@@ -1015,7 +1015,7 @@ class Oblige(object):
                     switch.nvp_id,
                     switch.network_id,
                     switch.display_name,
-                    switch.port_count,
+                    len(ports),
                     switch.transport_zone,
                     switch.transport_connector,
                     switch.segment_connector,
